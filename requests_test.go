@@ -18,7 +18,7 @@ import (
 // Stub `requests` namespace
 type stubRequests struct {
 	Get      func(string, string, map[string]string) (*stubResponse, error)
-	GetAsync func(string, string, map[string]string, int) (chan interface{}, error)
+	GetAsync func(string, string, map[string]string, int) (chan *stubResponse, error)
 	//Post     func(string, string, map[string]interface{}) (*http.Response, error)
 }
 
@@ -97,8 +97,8 @@ func newStubServer(addr string, res *stubResponse, lat time.Duration) *stubServe
 
 func (s *stubServer) Reply(code statusCode) *stubResponse {
 	// Block for server's latency
-	//<-time.Tick(s.latency)
-	time.Sleep(s.latency)
+	<-time.Tick(s.latency)
+	//time.Sleep(s.latency)
 	// Create status code and return the response
 	s.response.StatusCode = (int)(code)
 	// TODO: Assign Status
@@ -120,38 +120,20 @@ func (c *stubClient) Do(req *stubRequest, conn *stubConnection, server *stubServ
 	// Block for the duration of `conn.latency` + `server.latency`
 	// to simulaate real-world latencies and test timeoutn
 	code := (statusCode)(server.response.StatusCode)
-	conn.channel <- req
-	go func() {
-		//request := <-conn
-		//<-time.Tick(conn.latency)
-		time.Sleep(conn.latency)
-		<-conn.channel
-		// TODO: Do something with the receive request
-		conn.channel <- server.Reply(code)
-		//<-time.Tick(server.latency)
-		time.Sleep(server.latency)
-		conn.done <- true
-	}()
-		
-	<-conn.done
-	res := <-conn.channel
-	return res.(*stubResponse), nil
-}
 
-func (c *stubClient) DoAsync(req *stubRequest, conn *stubConnection, server *stubServer) (chan interface{}, error) {
-	code := (statusCode)(server.response.StatusCode)
-
-	// Network latency
-	time.Sleep(conn.latency)
 	conn.channel <- req
 
 	go func(conn *stubConnection) {
+		<-time.Tick(conn.latency)
 		<-conn.channel
 		// TODO: Do something with the receive request
 		conn.channel <- server.Reply(code)
-		//<-time.Tick(server.latency)
+		<-time.Tick(server.latency)
+		conn.done <- true
 	}(conn)
-	return conn.channel, nil
+	<-conn.done
+	res := <-conn.channel
+	return res.(*stubResponse), nil
 }
 
 var (
@@ -197,54 +179,28 @@ var (
 			}
 			return res, nil
 		},
-		GetAsync: func(url, body string, auth map[string]string, timeout int) (chan interface{}, error) {
-			waitUntil := time.Duration(timeout) * time.Second
+		GetAsync: func(url, body string, auth map[string]string, timeout int) (chan *stubResponse, error) {
 			data := ioutil.NopCloser(bytes.NewBuffer([]byte(body)))
-			client.Timeout = waitUntil
 			
 			req, err := newStubRequest("GET", url, data)
 			if err != nil {
 				panic(err)
 			}
-			// TODO: include basic auth
-			/*
-			if len(auth) > 0 {
-				for user, password := range auth {
-					req.SetBasicAuth(user, password)
+			
+			temp := make(chan *stubResponse, 1)
+			
+			go func(t chan *stubResponse) {
+				res, err := client.Do(req, conn, server)
+				if err != nil {
+					panic(err)
 				}
-			}
-                        */
-			channel, err := client.DoAsync(req, conn, server)
-			if err != nil {
-				panic(err)
-			}
-			
-			return channel, nil
-			
-
-			/*
-			p := NewPromise(func() (*http.Response, error) {
-				re := make(chan *http.Response)
-				er := make(chan error)
-				go func() {
-					res, err := client.Do(req, server)
-					if err != nil {
-						er <- err
-					}
-					re <- res
-					return
-				}()
-				defer close(re)
-				defer close(er)
-				return (*http.Response)(nil), errors.New("Time out")
-			})
-			return p, nil
-                        */
+				t <- res
+			}(temp)
+			return temp, nil
 		},
 	}
 )
 
-// Get response back as `*stubResponse`
 func TestGetResponseType(t *testing.T) {
 	resp, err := requests.Get(endpoint, jsonStr, auth)
 	if err != nil {
@@ -257,7 +213,6 @@ func TestGetResponseType(t *testing.T) {
 	}
 }
 
-// Get response back with status 200
 func TestGetResponseStatus(t *testing.T) {
 	resp, err := requests.Get(endpoint, jsonStr, auth)
 	if err != nil {
@@ -269,46 +224,36 @@ func TestGetResponseStatus(t *testing.T) {
 }
 
 func TestGetAsyncResponseType(t *testing.T) {
-	// 3 seconds timeout
 	timeout := 1
 	resultChan, err := requests.GetAsync(endpoint, jsonStr, auth, timeout)
 	if err != nil {
 		t.Error(err)
 	}
 	returnType := reflect.TypeOf(resultChan)
-	responseType := reflect.TypeOf(chan interface{}(nil))
+	responseType := reflect.TypeOf((chan *stubResponse)(nil))
 	if returnType != responseType {
-		t.Errorf("Expected return type of `chan interface{}`, but it was %v instead.", returnType)
+		t.Errorf("Expected return type of `chan *stubResponse`, but it was %v instead.", returnType)
 	}
 }
 
-/*
 func TestGetAsyncResponseStatus(t *testing.T) {
-	timeout := 0
-	p, err := requests.GetAsync("http://example.com", htmlStr, auth, timeout)
+	timeout := 1
+	resultChan, err := requests.GetAsync(endpoint, jsonStr, auth, timeout)
 	if err != nil {
 		t.Error(err)
 	}
 
-	result := p.Then(func() *http.Response { return p.res }, func() error { return p.err })
-
-	// Result should be either `*http.Response` or `error`
-	switch result := result.(type) {
-	default:
-		t.Error()
-	case *http.Response:
-    		if result.Status != "200 OK" {
-			t.Errorf("Expected Status `200 OK`, but it was %s instead.", result.Status)
+	select {
+	case result := <-resultChan:
+		if result.StatusCode != 200 {
+			t.Errorf("Expected Status of `200 OK`, but it was `%s` instead.", res.Status)
 		}
 		break
-	case error:
-		if result.Error() == "" {
-			t.Errorf("Expected `error.`")
-		}
-		break
+	// TODO: Fix this timeout
+	case <-time.Tick(time.Duration(timeout) * time.Second):
+		t.Log("time out!")
 	}
 }
-*/
 
 func TestMain(m *testing.M) {
 	v := m.Run()
