@@ -19,10 +19,9 @@ func Get(url, body string, auth map[string]string) (*http.Response, error) {
 	if err != nil {
 		return (*http.Response)(nil), err
 	}
-	client := &http.Client{}
 	// TODO: include basic auth
 	fmt.Println("going to Do")
-	res, err := client.Do(req)
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return (*http.Response)(nil), err
 	}

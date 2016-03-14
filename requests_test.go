@@ -19,7 +19,7 @@ import (
 type stubRequests struct {
 	Get      func(string, string, map[string]string) (*stubResponse, error)
 	GetAsync func(string, string, map[string]string, int) (chan *stubResponse, error)
-	//Post     func(string, string, map[string]interface{}) (*http.Response, error)
+	Post     func(string, string, []byte) (*http.Response, error)
 }
 
 // Stub connection
@@ -136,6 +136,11 @@ func (c *stubClient) Do(req *stubRequest, conn *stubConnection, server *stubServ
 	return res.(*stubResponse), nil
 }
 
+/*
+func (c *stubClient) Post(url string, bodyType string, body io.Reader) (*stubResponse, error) {
+}
+*/
+
 var (
 	// Setup connection
 	networkLatency = time.Duration(100) * time.Millisecond
@@ -198,6 +203,18 @@ var (
 			}(temp)
 			return temp, nil
 		},
+		/*
+		Post: func(url string, bodyType string, body []byte) (*stubResponse, error) {
+			bodyReader := bytes.NewReader(body)
+
+			req, err := newStubRequest("POST", url, data)
+			if err != nil {
+				panic(err)
+			}
+			
+			res, err := client.Post(url, bodyType, bodyReader)
+		},
+                */
 	}
 )
 
@@ -259,7 +276,7 @@ func TestMain(m *testing.M) {
 	v := m.Run()
 	defer conn.Close()
 	if v == 0 {
-		os.Exit(1)
+		os.Exit(v)
 	}
-	os.Exit(v)
+	os.Exit(0)
 }
