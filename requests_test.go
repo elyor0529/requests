@@ -12,12 +12,13 @@ import (
 	"os"
 	"reflect"
 	"time"
+	//"runtime"
 )
 
 // Stub `requests` namespace
 type stubRequests struct {
 	Get      func(string, string, map[string]string) (*stubResponse, error)
-	GetAsync func(string, string, map[string]string, int) (chan *stubResponse, error)
+	GetAsync func(string, string, map[string]string, int) (chan interface{}, error)
 	//Post     func(string, string, map[string]interface{}) (*http.Response, error)
 }
 
@@ -135,7 +136,23 @@ func (c *stubClient) Do(req *stubRequest, conn *stubConnection, server *stubServ
 	<-conn.done
 	res := <-conn.channel
 	return res.(*stubResponse), nil
-	}
+}
+
+func (c *stubClient) DoAsync(req *stubRequest, conn *stubConnection, server *stubServer) (chan interface{}, error) {
+	code := (statusCode)(server.response.StatusCode)
+
+	// Network latency
+	time.Sleep(conn.latency)
+	conn.channel <- req
+
+	go func(conn *stubConnection) {
+		<-conn.channel
+		// TODO: Do something with the receive request
+		conn.channel <- server.Reply(code)
+		//<-time.Tick(server.latency)
+	}(conn)
+	return conn.channel, nil
+}
 
 var (
 	// Setup connection
@@ -180,18 +197,32 @@ var (
 			}
 			return res, nil
 		},
-		/*
-		GetAsync: func(url, body string, auth map[string]string, timeout int) (*Promise, error) {
-			waituntil := time.Duration(timeout) * time.Second
+		GetAsync: func(url, body string, auth map[string]string, timeout int) (chan interface{}, error) {
+			waitUntil := time.Duration(timeout) * time.Second
 			data := ioutil.NopCloser(bytes.NewBuffer([]byte(body)))
-
-			req, err := http.NewRequest("GET", url, data)
+			client.Timeout = waitUntil
+			
+			req, err := newStubRequest("GET", url, data)
 			if err != nil {
-				return (*Promise)(nil), err
+				panic(err)
 			}
+			// TODO: include basic auth
+			/*
+			if len(auth) > 0 {
+				for user, password := range auth {
+					req.SetBasicAuth(user, password)
+				}
+			}
+                        */
+			channel, err := client.DoAsync(req, conn, server)
+			if err != nil {
+				panic(err)
+			}
+			
+			return channel, nil
+			
 
-			client.Timeout = waituntil
-
+			/*
 			p := NewPromise(func() (*http.Response, error) {
 				re := make(chan *http.Response)
 				er := make(chan error)
@@ -208,8 +239,8 @@ var (
 				return (*http.Response)(nil), errors.New("Time out")
 			})
 			return p, nil
+                        */
 		},
-                */
 	}
 )
 
@@ -237,21 +268,21 @@ func TestGetResponseStatus(t *testing.T) {
 	}
 }
 
-/*
 func TestGetAsyncResponseType(t *testing.T) {
 	// 3 seconds timeout
-	timeout := 0
-	promise, err := requests.GetAsync("http://example.com", htmlStr, auth, timeout)
+	timeout := 1
+	resultChan, err := requests.GetAsync(endpoint, jsonStr, auth, timeout)
 	if err != nil {
 		t.Error(err)
 	}
-	returnType := reflect.TypeOf(promise)
-	responseType := reflect.TypeOf((*Promise)(nil))
+	returnType := reflect.TypeOf(resultChan)
+	responseType := reflect.TypeOf(chan interface{}(nil))
 	if returnType != responseType {
-		t.Errorf("Expected return type of `chan *http.Response`, but it was %v instead.", returnType)
+		t.Errorf("Expected return type of `chan interface{}`, but it was %v instead.", returnType)
 	}
 }
 
+/*
 func TestGetAsyncResponseStatus(t *testing.T) {
 	timeout := 0
 	p, err := requests.GetAsync("http://example.com", htmlStr, auth, timeout)
@@ -280,8 +311,6 @@ func TestGetAsyncResponseStatus(t *testing.T) {
 */
 
 func TestMain(m *testing.M) {
-	//networkLatency := 1 * time.Second
-	//Conn := newConnection(networkLatency)
 	v := m.Run()
 	defer conn.Close()
 	if v == 0 {
