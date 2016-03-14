@@ -2,13 +2,13 @@ package requests
 
 import (
 	//"fmt"
+	"bytes"
 	"net/http"
 	"testing"
-	"bytes"
 	//"errors"
 	"io"
-	"net/url"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"reflect"
 	"time"
@@ -25,7 +25,7 @@ type stubRequests struct {
 // Stub connection
 type stubConnection struct {
 	channel chan interface{}
-	done chan bool
+	done    chan bool
 	latency time.Duration
 }
 
@@ -34,7 +34,7 @@ func newStubConnection(latency time.Duration) *stubConnection {
 	done := make(chan bool, 1)
 	connection := &stubConnection{
 		channel: channel,
-		done: done,
+		done:    done,
 		latency: latency,
 	}
 	return connection
@@ -46,7 +46,7 @@ func (c *stubConnection) Close() {
 }
 
 // Stub `http.Request`
-type stubRequest struct { http.Request }
+type stubRequest struct{ http.Request }
 
 func newStubRequest(method, rawurl string, body io.ReadCloser) (*stubRequest, error) {
 	uri, err := url.ParseRequestURI(rawurl)
@@ -56,24 +56,24 @@ func newStubRequest(method, rawurl string, body io.ReadCloser) (*stubRequest, er
 	request := &stubRequest{
 		Request: http.Request{
 			Method: method,
-			URL: uri,
-			Body: body,
+			URL:    uri,
+			Body:   body,
 		},
 	}
 	return request, nil
 }
 
 // Stub `http.Response`
-type stubResponse struct { http.Response }
+type stubResponse struct{ http.Response }
 
 func newStubResponse(status string, code int, header http.Header, body io.ReadCloser) *stubResponse {
 	response := &stubResponse{
 		Response: http.Response{
-			Status: status,
+			Status:     status,
 			StatusCode: code,
-			Proto: "HTTP/1.0",
-			Header: header,
-			Body: body,
+			Proto:      "HTTP/1.0",
+			Header:     header,
+			Body:       body,
 		},
 	}
 	return response
@@ -88,9 +88,9 @@ type stubServer struct {
 
 func newStubServer(addr string, res *stubResponse, lat time.Duration) *stubServer {
 	server := &stubServer{
-		Server: http.Server{ Addr: addr },
+		Server:   http.Server{Addr: addr},
 		response: res,
-		latency: lat,
+		latency:  lat,
 	}
 	return server
 }
@@ -106,11 +106,11 @@ func (s *stubServer) Reply(code statusCode) *stubResponse {
 }
 
 // Stub the `http.Client`
-type stubClient struct { http.Client }
+type stubClient struct{ http.Client }
 
 func newStubClient(timeout time.Duration) *stubClient {
 	client := &stubClient{
-		Client: http.Client{ Timeout: timeout },
+		Client: http.Client{Timeout: timeout},
 	}
 	return client
 }
@@ -139,23 +139,23 @@ func (c *stubClient) Do(req *stubRequest, conn *stubConnection, server *stubServ
 var (
 	// Setup connection
 	networkLatency = time.Duration(100) * time.Millisecond
-	conn = newStubConnection(networkLatency)
+	conn           = newStubConnection(networkLatency)
 
 	// Setup client
 	timeout = time.Duration(3) * time.Second
-	client = newStubClient(timeout)
+	client  = newStubClient(timeout)
 
 	// Setup server
-	res = newStubResponse("200 OK", 200, header, body)
-	endpoint = "http://jochasinga.io"
+	res           = newStubResponse("200 OK", 200, header, body)
+	endpoint      = "http://jochasinga.io"
 	serverLatency = time.Duration(100) * time.Millisecond
-	server = newStubServer(endpoint, res, serverLatency)
+	server        = newStubServer(endpoint, res, serverLatency)
 
 	// Setup request
-	header = http.Header{}
-	jsonStr = `{"foo": ["bar", "baz"]}`
-	body = ioutil.NopCloser(bytes.NewBuffer([]byte(jsonStr)))
-	auth = map[string]string{"user": "pass"}
+	header   = http.Header{}
+	jsonStr  = `{"foo": ["bar", "baz"]}`
+	body     = ioutil.NopCloser(bytes.NewBuffer([]byte(jsonStr)))
+	auth     = map[string]string{"user": "pass"}
 	requests = &stubRequests{
 		Get: func(url, body string, auth map[string]string) (*stubResponse, error) {
 			// Convert body from string to io.ReadCloser
@@ -167,12 +167,12 @@ var (
 			}
 			// TODO: include basic auth
 			/*
-			if len(auth) > 0 {
-				for user, password := range auth {
-					req.SetBasicAuth(user, password)
+				if len(auth) > 0 {
+					for user, password := range auth {
+						req.SetBasicAuth(user, password)
+					}
 				}
-			}
-                        */
+			*/
 			res, err := client.Do(req, conn, server)
 			if err != nil {
 				panic(err)
@@ -181,14 +181,14 @@ var (
 		},
 		GetAsync: func(url, body string, auth map[string]string, timeout int) (chan *stubResponse, error) {
 			data := ioutil.NopCloser(bytes.NewBuffer([]byte(body)))
-			
+
 			req, err := newStubRequest("GET", url, data)
 			if err != nil {
 				panic(err)
 			}
-			
+
 			temp := make(chan *stubResponse, 1)
-			
+
 			go func(t chan *stubResponse) {
 				res, err := client.Do(req, conn, server)
 				if err != nil {

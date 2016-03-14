@@ -2,8 +2,10 @@ package requests
 
 import (
 	"fmt"
-	"io"
+	"bytes"
+	"time"
 	"net/http"
+	"io/ioutil"
 )
 
 type Auth struct {
@@ -11,47 +13,41 @@ type Auth struct {
 	password string
 }
 
-func Get(url string, body io.Reader, auth Auth) (*http.Response, error) {
-	req, err := http.NewRequest("GET", url, body)
+func Get(url, body string, auth map[string]string) (*http.Response, error) {
+	bodyReadCloser := ioutil.NopCloser(bytes.NewBuffer([]byte(body)))
+	req, err := http.NewRequest("GET", url, bodyReadCloser)
 	if err != nil {
-		panic(err)
+		return (*http.Response)(nil), err
 	}
-	/*
-		if auth {
-			req.SetBasicAuth(auth.user, auth.password)
-		}
-	*/
-	client := &http.Client{
-		Timeout: 2,
-	}
-	resp, err := client.Do(req)
+	client := &http.Client{}
+	// TODO: include basic auth
+	fmt.Println("going to Do")
+	res, err := client.Do(req)
 	if err != nil {
-		panic(err)
+		return (*http.Response)(nil), err
 	}
-	fmt.Println("Bye")
-	return resp, nil
+	return res, nil
 }
 
-func GetAsync(url string, body io.Reader, auth Auth) (*http.Response, error) {
-	response := make(chan *http.Response)
-	go func() {
-		req, err := http.NewRequest("GET", url, body)
+func GetAsync(url, body string, auth map[string]string, timeout int) (chan *http.Response, error) {
+	bodyReadCloser := ioutil.NopCloser(bytes.NewBuffer([]byte(body)))
+	req, err := http.NewRequest("GET", url, bodyReadCloser)
+	if err != nil {
+		return nil, err
+	}
+	client := &http.Client{ Timeout: time.Duration(timeout) * time.Second }
+	reschan := make(chan *http.Response, 1)
+	go func(c chan *http.Response) error {
+		res, err := client.Do(req)
 		if err != nil {
-			panic(err)
+			return err
 		}
-		client := &http.Client{
-			CheckRedirect: nil,
-			Timeout:       0,
-		}
-		resp, err := client.Do(req)
-		if err != nil {
-			panic(err)
-		}
-		response <- resp
-	}()
-	return <-response, nil
+		c <- res
+		return nil
+	}(reschan)
+	return reschan, nil
 }
-
+/*
 func Post(url string, bodyType string, body io.Reader) (*http.Response, error) {
 	req, err := http.NewRequest("POST", url, body)
 	if err != nil {
@@ -66,3 +62,4 @@ func Post(url string, bodyType string, body io.Reader) (*http.Response, error) {
 	}
 	return resp, nil
 }
+*/
