@@ -2,6 +2,13 @@ requests
 ========
 Go HTTP Requests for Rodents (◕ᴥ◕)
 
+Why Requests?
+-------------
+Go's very own `net/http` has all the meat for HTTP requests. `requests` is a tool to help
+making expressive RESTful calls without having to deal with `net/http` types and those types
+headaches are made of such as `io.Reader` and `io.ReadCloser`.
+`Requests` follows the naming convention of HTTP libraries in [Python](http://docs.python-requests.org/en/master/ "requests") and [Node.js](https://www.npmjs.com/package/request "request").
+
 Install
 -------
 
@@ -14,16 +21,36 @@ $ go get github.com/jochasinga/requests
 Examples
 --------
 
-Send a request to a URL and wait for the response.
+Send a GET request to a URL and wait for the response.
 
 ```go
 
-auth := map[string]string{ "user" : "pass" }
-res, _ := requests.Get("https://golang.org", "", auth)
+import (
+	"github.com/jochasinga/requests"
+)
 
-fmt.Println(res.StatusCode)  // 200
+
+func main() {
+	rq := requests.New()
+	auth := map[string]string{ "user" : "pass" }
+	res, _ := rq.Get("https://golang.org", nil, auth)
+
+	fmt.Println(res.StatusCode)  // 200
+}
 
 ```
+
+Data can be an array, slice, map, or struct.
+
+```go
+
+data := struct {
+	foo []string
+}{ []string{ "bar", "baz" } }
+res, _ := rq.Post("https://httpbin.org/post", "application/json", data)
+
+```
+
 Response returned is just a normal `*http.Response`
 
 ```go
@@ -34,11 +61,12 @@ fmt.Println(buf.String())    // Print response's Body
 
 ```
 
-Asynchronous call will transparently return a channel, on which you can wait for the response.
+`GetAsync` transparently returns a channel, on which you can wait for the response.
 
 ```go
 
-resChan, _ := requests.GetAsync("https://golang.org", "", nil, 2)
+timeout := time.Duration(1) * time.Second
+resChan, _ := rq.GetAsync("https://golang.org", nil, nil, timeout)
 
 // Do some other things
 
@@ -50,9 +78,9 @@ Or use `select` to poll many channels asynchronously
 
 ```go
 
-res1, _ := requests.GetAsync("http://google.com", "", nil, 1)
-res2, _ := requests.GetAsync("http://facebook.com", "", nil, 1)
-res3, _ := requests.GetAsync("http://docker.com", "", nil, 1)
+res1, _ := rq.GetAsync("http://google.com", nil, nil, timeout)
+res2, _ := rq.GetAsync("http://facebook.com", nil, nil, timeout)
+res3, _ := rq.GetAsync("http://docker.com", nil, nil, timeout)
 
 for i := 0; i < 3; i++ {
         select {
@@ -67,6 +95,7 @@ for i := 0; i < 3; i++ {
 
 ```
 
+*TODO: requests.Pool coming soon*
 
 
 

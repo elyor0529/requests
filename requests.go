@@ -1,41 +1,112 @@
 package requests
 
 import (
-	"fmt"
 	"bytes"
 	"time"
 	"net/http"
 	"io/ioutil"
+	"encoding/json"
 )
 
-type Auth struct {
-	user     string
-	password string
+type Req interface {
+	Get(string, interface{}, interface{}) (*http.Response, error)
+	GetAsync(string, interface{}, interface{}, time.Duration) (chan *http.Response, error)
+	Post(string, string, interface{}) (*http.Response, error)
 }
 
-func Get(url, body string, auth map[string]string) (*http.Response, error) {
-	bodyReadCloser := ioutil.NopCloser(bytes.NewBuffer([]byte(body)))
-	req, err := http.NewRequest("GET", url, bodyReadCloser)
+type Requests struct {}
+
+func New() *Requests {
+	return new(Requests)
+}
+
+func marshalData(data, auth interface{}) (map[string][]byte, error) {
+	
+	d, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+
+	a, err := json.Marshal(auth)
+	if err != nil {
+		return nil, err
+	}
+
+	results := map[string][]byte{"data": d, "auth": a}
+	return results, nil
+}
+
+func (r *Requests) Get(url string, data, auth interface{}) (*http.Response, error) {
+
+	results, err := marshalData(data, auth)
 	if err != nil {
 		return (*http.Response)(nil), err
 	}
-	// TODO: include basic auth
-	fmt.Println("going to Do")
+
+	dat, aut := results["data"], results["auth"]
+
+	dataReadCloser := ioutil.NopCloser(bytes.NewBuffer(dat))
+
+	req, err := http.NewRequest("GET", url, dataReadCloser)
+	if err != nil {
+		return (*http.Response)(nil), err
+	}
+
+	var authData map[string]interface{}
+
+	if err := json.Unmarshal(aut, &authData); err != nil {
+		return (*http.Response)(nil), err
+	}
+
+	for user, password := range authData {
+		pw, ok := password.(string)
+		if !ok {
+			return (*http.Response)(nil), err
+		}
+		req.SetBasicAuth(user, pw)
+	}                                                                                         
+ 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return (*http.Response)(nil), err
 	}
+	
 	return res, nil
 }
 
-func GetAsync(url, body string, auth map[string]string, timeout int) (chan *http.Response, error) {
-	bodyReadCloser := ioutil.NopCloser(bytes.NewBuffer([]byte(body)))
-	req, err := http.NewRequest("GET", url, bodyReadCloser)
+func (r *Requests) GetAsync(url string, data, auth interface{}, timeout time.Duration) (chan *http.Response, error) {
+	results, err := marshalData(data, auth)
 	if err != nil {
-		return nil, err
+		return (chan *http.Response)(nil), err
 	}
-	client := &http.Client{ Timeout: time.Duration(timeout) * time.Second }
+
+	dat, aut := results["data"], results["auth"]
+
+	dataReadCloser := ioutil.NopCloser(bytes.NewBuffer(dat))
+
+	req, err := http.NewRequest("GET", url, dataReadCloser)
+	if err != nil {
+		return (chan *http.Response)(nil), err
+	}
+
+	var authData map[string]interface{}
+
+	if err := json.Unmarshal(aut, &authData); err != nil {
+		return (chan *http.Response)(nil), err
+	}
+
+	for user, password := range authData {
+		pw, ok := password.(string)
+		if !ok {
+			return (chan *http.Response)(nil), err
+		}
+		req.SetBasicAuth(user, pw)
+	}                                                                                         
+ 	
+	client := &http.Client{Timeout: timeout}
+	
 	reschan := make(chan *http.Response, 1)
+	
 	go func(c chan *http.Response) error {
 		res, err := client.Do(req)
 		if err != nil {
@@ -44,21 +115,29 @@ func GetAsync(url, body string, auth map[string]string, timeout int) (chan *http
 		c <- res
 		return nil
 	}(reschan)
+	
 	return reschan, nil
 }
-/*
-func Post(url string, bodyType string, body io.Reader) (*http.Response, error) {
-	req, err := http.NewRequest("POST", url, body)
+
+func (r *Requests) Post(url, bodyType string, data interface{}) (*http.Response, error) {
+	
+	dat, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
 	}
-	client := &http.Client{
-		CheckRedirect: nil,
-	}
-	resp, err := client.Do(req)
+	
+	dataReadCloser := ioutil.NopCloser(bytes.NewBuffer(dat))
+
+	req, err := http.NewRequest("POST", url, dataReadCloser)
 	if err != nil {
-		return nil, err
+		return (*http.Response)(nil), err
 	}
-	return resp, nil
+ 
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return (*http.Response)(nil), err
+	}
+	
+	return res, nil
 }
-*/
+
