@@ -2,12 +2,15 @@ requests
 ========
 Go HTTP Requests for Rodents (◕ᴥ◕)
 
-Why Requests?
+Why Another HTTP Package?
 -------------
-Go's very own `net/http` has all the meat for HTTP requests. `requests` is a tool to help
-making expressive RESTful calls without having to deal with `net/http` types and those types
-headaches are made of such as `io.Reader` and `io.ReadCloser`.
-`Requests` follows the naming convention of HTTP libraries in [Python](http://docs.python-requests.org/en/master/ "requests") and [Node.js](https://www.npmjs.com/package/request "request").
+Go's very own `net/http` has it all for making HTTP requests. However, `requests` wants to help
+make yummy and declarative RESTful calls. Meaning you don't have to deal with `net/http` types 
+and those types headaches are made of (such as `io.Reader` and `io.ReadCloser`).
+It is safe for all [rodents](http://www.styletails.com/wp-content/uploads/2014/06/guinea-pig-booboo-lieveheersbeestje-2.jpg), not just gophers. 
+
+`requests` was first written to interact with Elasticsearch, thus it focuses on RESTful JSON.
+It wants to join the rank of Python [requests](http://docs.python-requests.org/en/master/ "requests") and Node.js [request](https://www.npmjs.com/package/request "request"). So help contribute and make it betta!
 
 Install
 -------
