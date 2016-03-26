@@ -1,282 +1,234 @@
 package requests
 
 import (
-	//"fmt"
-	"bytes"
-	"net/http"
-	"testing"
+	"fmt"
 	//"errors"
-	"io"
+	"encoding/json"
+	//"bytes"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	//"io"
 	"io/ioutil"
-	"net/url"
-	"os"
+	//"net/url"
+	//"os"
 	"reflect"
 	"time"
-	//"runtime"
+	. "github.com/smartystreets/goconvey/convey"
 )
 
-// Stub `requests` namespace
-type stubRequests struct {
-	Get      func(string, string, map[string]string) (*stubResponse, error)
-	GetAsync func(string, string, map[string]string, int) (chan *stubResponse, error)
-	Post     func(string, string, []byte) (*http.Response, error)
-}
-
-// Stub connection
-type stubConnection struct {
-	channel chan interface{}
-	done    chan bool
-	latency time.Duration
-}
-
-func newStubConnection(latency time.Duration) *stubConnection {
-	channel := make(chan interface{}, 1)
-	done := make(chan bool, 1)
-	connection := &stubConnection{
-		channel: channel,
-		done:    done,
-		latency: latency,
-	}
-	return connection
-}
-
-func (c *stubConnection) Close() {
-	close(c.channel)
-	close(c.done)
-}
-
-// Stub `http.Request`
-type stubRequest struct{ http.Request }
-
-func newStubRequest(method, rawurl string, body io.ReadCloser) (*stubRequest, error) {
-	uri, err := url.ParseRequestURI(rawurl)
-	if err != nil {
-		panic("Something's wrong with your URI")
-	}
-	request := &stubRequest{
-		Request: http.Request{
-			Method: method,
-			URL:    uri,
-			Body:   body,
-		},
-	}
-	return request, nil
-}
-
-// Stub `http.Response`
-type stubResponse struct{ http.Response }
-
-func newStubResponse(status string, code int, header http.Header, body io.ReadCloser) *stubResponse {
-	response := &stubResponse{
-		Response: http.Response{
-			Status:     status,
-			StatusCode: code,
-			Proto:      "HTTP/1.0",
-			Header:     header,
-			Body:       body,
-		},
-	}
-	return response
-}
-
-// Stub `http.Server`
-type stubServer struct {
-	http.Server
-	response *stubResponse
-	latency  time.Duration
-}
-
-func newStubServer(addr string, res *stubResponse, lat time.Duration) *stubServer {
-	server := &stubServer{
-		Server:   http.Server{Addr: addr},
-		response: res,
-		latency:  lat,
-	}
-	return server
-}
-
-func (s *stubServer) Reply(code statusCode) *stubResponse {
-	// Block for server's latency
-	<-time.Tick(s.latency)
-	//time.Sleep(s.latency)
-	// Create status code and return the response
-	s.response.StatusCode = (int)(code)
-	// TODO: Assign Status
-	return s.response
-}
-
-// Stub the `http.Client`
-type stubClient struct{ http.Client }
-
-func newStubClient(timeout time.Duration) *stubClient {
-	client := &stubClient{
-		Client: http.Client{Timeout: timeout},
-	}
-	return client
-}
-
-// Inject `*stubConnection` and `*stubServer` to simulate a server call
-func (c *stubClient) Do(req *stubRequest, conn *stubConnection, server *stubServer) (*stubResponse, error) {
-	// Block for the duration of `conn.latency` + `server.latency`
-	// to simulaate real-world latencies and test timeoutn
-	code := (statusCode)(server.response.StatusCode)
-
-	conn.channel <- req
-
-	go func(conn *stubConnection) {
-		<-time.Tick(conn.latency)
-		<-conn.channel
-		// TODO: Do something with the receive request
-		conn.channel <- server.Reply(code)
-		<-time.Tick(server.latency)
-		conn.done <- true
-	}(conn)
-	<-conn.done
-	res := <-conn.channel
-	return res.(*stubResponse), nil
-}
-
-/*
-func (c *stubClient) Post(url string, bodyType string, body io.Reader) (*stubResponse, error) {
-}
-*/
-
-var (
-	// Setup connection
-	networkLatency = time.Duration(100) * time.Millisecond
-	conn           = newStubConnection(networkLatency)
-
-	// Setup client
-	timeout = time.Duration(3) * time.Second
-	client  = newStubClient(timeout)
-
-	// Setup server
-	res           = newStubResponse("200 OK", 200, header, body)
-	endpoint      = "http://jochasinga.io"
-	serverLatency = time.Duration(100) * time.Millisecond
-	server        = newStubServer(endpoint, res, serverLatency)
-
-	// Setup request
-	header   = http.Header{}
-	jsonStr  = `{"foo": ["bar", "baz"]}`
-	body     = ioutil.NopCloser(bytes.NewBuffer([]byte(jsonStr)))
-	auth     = map[string]string{"user": "pass"}
-	requests = &stubRequests{
-		Get: func(url, body string, auth map[string]string) (*stubResponse, error) {
-			// Convert body from string to io.ReadCloser
-			bodyReadCloser := ioutil.NopCloser(bytes.NewBuffer([]byte(body)))
-			//req, err := http.NewRequest("GET", url, bodyReadCloser)
-			req, err := newStubRequest("GET", url, bodyReadCloser)
-			if err != nil {
-				panic(err)
-			}
-			// TODO: include basic auth
-			/*
-				if len(auth) > 0 {
-					for user, password := range auth {
-						req.SetBasicAuth(user, password)
-					}
-				}
-			*/
-			res, err := client.Do(req, conn, server)
-			if err != nil {
-				panic(err)
-			}
-			return res, nil
-		},
-		GetAsync: func(url, body string, auth map[string]string, timeout int) (chan *stubResponse, error) {
-			data := ioutil.NopCloser(bytes.NewBuffer([]byte(body)))
-
-			req, err := newStubRequest("GET", url, data)
-			if err != nil {
-				panic(err)
-			}
-
-			temp := make(chan *stubResponse, 1)
-
-			go func(t chan *stubResponse) {
-				res, err := client.Do(req, conn, server)
+func TestGetResponseTypeAndContent(t *testing.T) {
+	Convey("GIVEN the Server Handler", t, func() {
+		var d map[string]interface{}
+		rq := New()
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			msg := "Hello, requests"
+			if r.Body != nil {
+				data, err := ioutil.ReadAll(r.Body)
 				if err != nil {
-					panic(err)
+					t.Error(err)
 				}
-				t <- res
-			}(temp)
-			return temp, nil
-		},
-		/*
-		Post: func(url string, bodyType string, body []byte) (*stubResponse, error) {
-			bodyReader := bytes.NewReader(body)
-
-			req, err := newStubRequest("POST", url, data)
+				if err = json.Unmarshal(data, &d); err != nil {
+					t.Error(err)
+				}
+			}
+			if len(d) > 0 {
+				for k, _ := range d {
+					msg += ", " + k
+				}
+			}
+			if len(r.Header["Authorization"]) > 0 {
+				msg += ", auth"
+			}
+			fmt.Fprintf(w, msg)
+		}))
+		Convey("WITH data and auth maps", func() {
+			auth := map[string]string{"user": "password"}
+			data := map[string][]string{"foo": []string{"bar", "baz"}}
+			resp, err := rq.Get(ts.URL, data, auth)
 			if err != nil {
-				panic(err)
+				t.Error(err)
+			}
+			Convey("EXPECT Get() to return *httpResponse", func() {
+				returnType := reflect.TypeOf(resp)
+				responseType := reflect.TypeOf((*http.Response)(nil))
+				So(returnType, ShouldEqual, responseType)
+			})
+			Convey("EXPECT Get() to return correct content", func() {
+				body, err := ioutil.ReadAll(resp.Body)
+				defer resp.Body.Close()
+				if err != nil {
+					t.Error(err)
+				}
+				greeting := string(body)
+				So(greeting, ShouldEqual, "Hello, requests, foo, auth")
+			})
+
+		})
+		Convey("WITH data and auth structs", func() {
+			auth := struct {
+				User     string
+				Password string
+			}{ "user", "password" }
+			
+			data := struct {
+				Foo []string `json:"foo"`
+			}{ []string{"bar", "baz"} }
+			resp, err := rq.Get(ts.URL, data, auth)
+			if err != nil {
+				t.Error(err)
+			}
+			Convey("EXPECT Get() to return *httpResponse", func() {
+				returnType := reflect.TypeOf(resp)
+				responseType := reflect.TypeOf((*http.Response)(nil))
+				So(returnType, ShouldEqual, responseType)
+
+			})
+			Convey("EXPECT Get() to return correct content", func() {
+				body, err := ioutil.ReadAll(resp.Body)
+				defer resp.Body.Close()
+				if err != nil {
+					t.Error(err)
+				}
+				greeting := string(body)
+				So(greeting, ShouldEqual, "Hello, requests, foo, auth")
+			})
+		})
+
+		Convey("WITH data and auth as nil", func() {
+			resp, err := rq.Get(ts.URL, nil, nil)
+			if err != nil {
+				t.Error(err)
+			}
+			Convey("EXPECT Get() to return type *httpResponse", func() {
+				returnType := reflect.TypeOf(resp)
+				responseType := reflect.TypeOf((*http.Response)(nil))
+				So(returnType, ShouldEqual, responseType)
+			})
+			Convey("EXPECT Get() to return correct content", func() {
+				body, err := ioutil.ReadAll(resp.Body)
+				defer resp.Body.Close()
+				if err != nil {
+					t.Error(err)
+				}
+				greeting := string(body)
+				So(greeting, ShouldEqual, "Hello, requests")
+			})
+		})
+		Reset(func() {
+			ts.Close()
+		})
+	})
+}
+
+func TestGetAsyncResponseTypeAndContent(t *testing.T) {
+	Convey("GIVEN the Server Handler with delay proxy", t, func() {
+		var d map[string]interface{}
+		timeout := time.Duration(5) * time.Second
+		rq := New()
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			msg := "Hello, requests"
+			if r.Body != nil {
+				data, err := ioutil.ReadAll(r.Body)
+				if err != nil {
+					t.Error(err)
+				}
+				if err = json.Unmarshal(data, &d); err != nil {
+					t.Error(err)
+				}
+			}
+			if len(d) > 0 {
+				for k, _ := range d {
+					msg += ", " + k
+				}
+			}
+			if len(r.Header["Authorization"]) > 0 {
+				msg += ", auth"
+			}
+			fmt.Fprintf(w, msg)
+		}))
+		
+		Convey("WITH data and auth maps", func() {
+			auth := map[string]string{"user": "password"}
+			data := map[string][]string{"foo": []string{"bar", "baz"}}
+			rc, err := rq.GetAsync(ts.URL, data, auth, timeout)
+			if err != nil {
+				t.Error(err)
+			}
+			Convey("EXPECT GetAsync() to return chan *httpResponse", func() {
+				returnType := reflect.TypeOf(rc)
+				responseType := reflect.TypeOf((chan *http.Response)(nil))
+				So(returnType, ShouldEqual, responseType)
+			})
+			Convey("EXPECT GetAsync() to return correct content", func() {
+				resp := <-rc
+				body, err := ioutil.ReadAll(resp.Body)
+				defer resp.Body.Close()
+				if err != nil {
+					t.Error(err)
+				}
+				greeting := string(body)
+				So(greeting, ShouldEqual, "Hello, requests, foo, auth")
+			})
+		})
+			
+		Convey("WITH data and auth structs", func() {
+			auth := struct {
+				User     string
+				Password string
+			}{ "user", "password" }
+			
+			data := struct {
+				Foo []string `json:"foo"`
+			}{ []string{"bar", "baz"} }
+			rc, err := rq.GetAsync(ts.URL, data, auth, timeout)
+			if err != nil {
+				t.Error(err)
 			}
 			
-			res, err := client.Post(url, bodyType, bodyReader)
-		},
-                */
-	}
-)
-
-func TestGetResponseType(t *testing.T) {
-	resp, err := requests.Get(endpoint, jsonStr, auth)
-	if err != nil {
-		t.Error(err)
-	}
-	returnType := reflect.TypeOf(resp)
-	responseType := reflect.TypeOf((*stubResponse)(nil))
-	if returnType != responseType {
-		t.Errorf("Expected return type of `*stubResponse`, but it was %v instead.", returnType)
-	}
+			Convey("EXPECT GetAsync() to return *chan httpResponse", func() {
+				returnType := reflect.TypeOf(rc)
+				responseType := reflect.TypeOf((chan *http.Response)(nil))
+				So(returnType, ShouldEqual, responseType)
+			})
+			
+			Convey("EXPECT GetAsync() to return correct content", func() {
+				resp := <-rc
+				body, err := ioutil.ReadAll(resp.Body)
+				defer resp.Body.Close()
+				if err != nil {
+					t.Error(err)
+				}
+				greeting := string(body)
+				So(greeting, ShouldEqual, "Hello, requests, foo, auth")
+			})
+		})
+		Convey("WITH data and auth as nil", func() {
+			rc, err := rq.GetAsync(ts.URL, nil, nil, timeout)
+			if err != nil {
+				t.Error(err)
+			}
+			
+			Convey("EXPECT GetAsync() to return type chan *httpResponse", func() {
+				returnType := reflect.TypeOf(rc)
+				responseType := reflect.TypeOf((chan *http.Response)(nil))
+				So(returnType, ShouldEqual, responseType)
+			})
+			Convey("EXPECT GetAsync() to return correct content", func() {
+				resp := <-rc
+				body, err := ioutil.ReadAll(resp.Body)
+				defer resp.Body.Close()
+				if err != nil {
+					t.Error(err)
+				}
+				greeting := string(body)
+				So(greeting, ShouldEqual, "Hello, requests")
+			})
+		})
+		Reset(func() {
+			ts.Close()
+		})
+	})
 }
 
-func TestGetResponseStatus(t *testing.T) {
-	resp, err := requests.Get(endpoint, jsonStr, auth)
-	if err != nil {
-		t.Error(err)
-	}
-	if resp.StatusCode != 200 {
-		t.Errorf("Expected StatusCode `200`, but it was %s instead.", resp.Status)
-	}
-}
 
-func TestGetAsyncResponseType(t *testing.T) {
-	timeout := 1
-	resultChan, err := requests.GetAsync(endpoint, jsonStr, auth, timeout)
-	if err != nil {
-		t.Error(err)
-	}
-	returnType := reflect.TypeOf(resultChan)
-	responseType := reflect.TypeOf((chan *stubResponse)(nil))
-	if returnType != responseType {
-		t.Errorf("Expected return type of `chan *stubResponse`, but it was %v instead.", returnType)
-	}
-}
-
-func TestGetAsyncResponseStatus(t *testing.T) {
-	timeout := 1
-	resultChan, err := requests.GetAsync(endpoint, jsonStr, auth, timeout)
-	if err != nil {
-		t.Error(err)
-	}
-
-	select {
-	case result := <-resultChan:
-		if result.StatusCode != 200 {
-			t.Errorf("Expected Status of `200 OK`, but it was `%s` instead.", res.Status)
-		}
-		break
-	// TODO: Fix this timeout
-	case <-time.Tick(time.Duration(timeout) * time.Second):
-		t.Log("time out!")
-	}
-}
-
-func TestMain(m *testing.M) {
-	v := m.Run()
-	defer conn.Close()
-	if v == 0 {
-		os.Exit(v)
-	}
-	os.Exit(0)
-}

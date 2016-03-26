@@ -128,16 +128,11 @@ func (r *Requests) Post(url, bodyType string, data interface{}) (*http.Response,
 	
 	dataReadCloser := ioutil.NopCloser(bytes.NewBuffer(dat))
 
-	req, err := http.NewRequest("POST", url, dataReadCloser)
+	res, err := http.DefaultClient.Post(url, bodyType, dataReadCloser)
 	if err != nil {
 		return (*http.Response)(nil), err
 	}
  
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return (*http.Response)(nil), err
-	}
-	
 	return res, nil
 }
 
