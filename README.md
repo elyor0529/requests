@@ -1,18 +1,15 @@
 requests
 ========
-[![Build Status](https://drone.io/github.com/jochasinga/requests/status.png)](https://drone.io/github.com/jochasinga/requests/latest)  [![Coverage Status](https://coveralls.io/repos/github/jochasinga/requests/badge.svg?style=flat-square)](https://coveralls.io/github/jochasinga/requests?branch=master)
+[![GoDoc](https://godoc.org/github.com/jochasinga/requests?status.svg?style=flat-square)](https://godoc.org/github.com/jochasinga/requests)  [![Build Status](https://drone.io/github.com/jochasinga/requests/status.png?style=flat-square)](https://drone.io/github.com/jochasinga/requests/latest)  [![Coverage Status](https://coveralls.io/repos/github/jochasinga/requests/badge.svg?style=flat-square)](https://coveralls.io/github/jochasinga/requests?branch=master)
 
 Go HTTP Requests for Rodents (◕ᴥ◕)
 
 Why Another HTTP Package?
--------------
+-------------------------
 Go's very own `net/http` has it all for making HTTP requests. However, `requests` wants to help
-make yummy and declarative RESTful calls. Meaning you don't have to deal with `net/http` types 
-and those types headaches are made of (such as `io.Reader` and `io.ReadCloser`).
+make REST calls more yummy and declarative. This Means you don't have to deal with `net/http` types 
+and those types headaches are usually made of (such as `io.Reader` and `io.ReadCloser`).
 It is safe for all [rodents](http://www.styletails.com/wp-content/uploads/2014/06/guinea-pig-booboo-lieveheersbeestje-2.jpg), not just gophers. 
-
-`requests` was first written to interact with Elasticsearch, thus it focuses on RESTful JSON.
-It wants to join the rank of Python [requests](http://docs.python-requests.org/en/master/ "requests") and Node.js [request](https://www.npmjs.com/package/request "request"). So help contribute and make it betta!
 
 Install
 -------
