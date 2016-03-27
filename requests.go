@@ -2,10 +2,10 @@ package requests
 
 import (
 	"bytes"
-	"time"
-	"net/http"
-	"io/ioutil"
 	"encoding/json"
+	"io/ioutil"
+	"net/http"
+	"time"
 )
 
 type Req interface {
