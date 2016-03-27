@@ -6,28 +6,28 @@ import (
 	"time"
 )
 
-type Proxy struct {
+type proxy struct {
 	*httptest.Server
-	Latency time.Duration
-	Backend *httptest.Server
+	latency time.Duration
+	backend *httptest.Server
 }
 
-func NewUnstartedProxy(latency time.Duration, backend *httptest.Server) *Proxy {
+func newUnstartedProxy(latency time.Duration, backend *httptest.Server) *proxy {
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		<-time.Tick(latency)
 		backend.Config.Handler.ServeHTTP(w, r)
 		<-time.Tick(latency)
 	}))
-	proxy := &Proxy{
+	proxy := &proxy{
 		Server:  server,
-		Latency: latency,
-		Backend: backend,
+		latency: latency,
+		backend: backend,
 	}
 	return proxy
 }
 
-func NewProxy(latency time.Duration, backend *httptest.Server) *Proxy {
-	proxy := NewUnstartedProxy(latency, backend)
+func newProxy(latency time.Duration, backend *httptest.Server) *proxy {
+	proxy := newUnstartedProxy(latency, backend)
 	proxy.Start()
 	return proxy
 }
