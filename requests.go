@@ -1,3 +1,4 @@
+// Package requests provide useful and declarative methods for RESTful HTTP requests.
 package requests
 
 import (
@@ -8,14 +9,10 @@ import (
 	"time"
 )
 
-type Req interface {
-	Get(string, interface{}, interface{}) (*http.Response, error)
-	GetAsync(string, interface{}, interface{}, time.Duration) (chan *http.Response, error)
-	Post(string, string, interface{}) (*http.Response, error)
-}
-
+// Requests needs to be created to use all the methods.
 type Requests struct {}
 
+// New returns a new *Requests instance
 func New() *Requests {
 	return new(Requests)
 }
@@ -36,6 +33,8 @@ func marshalData(data, auth interface{}) (map[string][]byte, error) {
 	return results, nil
 }
 
+// Get sends a HTTP GET request to the provided URL with the data and basic authorization
+// maps or structs. It returns *http.Response on success or error.
 func (r *Requests) Get(url string, data, auth interface{}) (*http.Response, error) {
 
 	results, err := marshalData(data, auth)
@@ -74,6 +73,8 @@ func (r *Requests) Get(url string, data, auth interface{}) (*http.Response, erro
 	return res, nil
 }
 
+// GetAsync sends a HTTP GET request to the provided URL with data and authorization
+// maps or structs. It returns a chan *http.Response immediately.
 func (r *Requests) GetAsync(url string, data, auth interface{}, timeout time.Duration) (chan *http.Response, error) {
 	results, err := marshalData(data, auth)
 	if err != nil {
@@ -119,6 +120,8 @@ func (r *Requests) GetAsync(url string, data, auth interface{}, timeout time.Dur
 	return reschan, nil
 }
 
+// Post sends a HTTP POST request to the provided URL, and encode the data according to
+// the appropriate bodyType.
 func (r *Requests) Post(url, bodyType string, data interface{}) (*http.Response, error) {
 	
 	dat, err := json.Marshal(data)

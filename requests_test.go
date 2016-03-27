@@ -143,7 +143,7 @@ func TestGetAsyncResponseTypeAndContent(t *testing.T) {
 		}))
 
 		latency := time.Duration(1) * time.Second
-		proxy := NewProxy(latency, ts)
+		proxy := newProxy(latency, ts)
 
 		Convey("WITH data and auth maps", func() {
 			auth := map[string]string{"user": "password"}
