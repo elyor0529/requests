@@ -109,6 +109,31 @@ func TestGetResponseTypeAndContent(t *testing.T) {
 				So(greeting, ShouldEqual, "Hello, requests")
 			})
 		})
+		// Edge cases for errors
+		Convey("WITH data as channel", func() {
+			data := make(chan int)
+			resp, err := rq.Get(ts.URL, data, nil)
+			Convey("EXPECT Get() to return an error", func() {
+				So(resp, ShouldBeNil)
+				So(err, ShouldNotBeNil)
+			})
+		})
+		Convey("WITH auth as func()", func() {
+			auth := func() {}
+			resp, err := rq.Get(ts.URL, nil, auth)
+			Convey("EXPECT Get() to return an error", func() {
+				So(resp, ShouldBeNil)
+				So(err, ShouldNotBeNil)
+			})
+		})
+		Convey("WITH malformed URL", func() {
+			badUrl := "://maggot.#&"
+			resp, err := rq.Get(badUrl, nil, nil)
+			Convey("EXPECT Get() to return an error", func() {
+				So(resp, ShouldBeNil)
+				So(err, ShouldNotBeNil)
+			})
+		})
 		Reset(func() {
 			ts.Close()
 		})
@@ -222,6 +247,31 @@ func TestGetAsyncResponseTypeAndContent(t *testing.T) {
 				So(greeting, ShouldEqual, "Hello, requests")
 			})
 		})
+		// Edge cases for errors
+		Convey("WITH data as a complex number", func() {
+			data := 12i
+			resp, err := rq.GetAsync(ts.URL, data, nil, timeout)
+			Convey("EXPECT Get() to return an error", func() {
+				So(resp, ShouldBeNil)
+				So(err, ShouldNotBeNil)
+			})
+		})
+		Convey("WITH auth as a channel", func() {
+			auth := make(chan complex64)
+			resp, err := rq.GetAsync(ts.URL, nil, auth, timeout)
+			Convey("EXPECT Get() to return an error", func() {
+				So(resp, ShouldBeNil)
+				So(err, ShouldNotBeNil)
+			})
+		})
+		Convey("WITH malformed URL", func() {
+			badUrl := "://maggot.#&"
+			resp, err := rq.GetAsync(badUrl, nil, nil, timeout)
+			Convey("EXPECT Get() to return an error", func() {
+				So(resp, ShouldBeNil)
+				So(err, ShouldNotBeNil)
+			})
+		})
 		Reset(func() {
 			ts.Close()
 			proxy.Close()
@@ -319,6 +369,23 @@ func TestPostResponseTypeAndContent(t *testing.T) {
 				}
 				greeting := string(body)
 				So(greeting, ShouldEqual, "Hello, requests")
+			})
+		})
+		// Edge cases for errors
+		Convey("WITH data as a complex number", func() {
+			data := 12i
+			resp, err := rq.Post(ts.URL, "application/json", data)
+			Convey("EXPECT Post() to return an error", func() {
+				So(resp, ShouldBeNil)
+				So(err, ShouldNotBeNil)
+			})
+		})
+		Convey("WITH malformed URL", func() {
+			badUrl := "://maggot.#&"
+			resp, err := rq.Post(badUrl, "application/json", nil)
+			Convey("EXPECT Post() to return an error", func() {
+				So(resp, ShouldBeNil)
+				So(err, ShouldNotBeNil)
 			})
 		})
 		Reset(func() {
