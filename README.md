@@ -1,6 +1,6 @@
 requests
 ========
-[![GoDoc](https://godoc.org/github.com/jochasinga/requests?status.svg)](https://godoc.org/github.com/jochasinga/requests)  [![Build Status](https://drone.io/github.com/jochasinga/requests/status.png?style=flat)](https://drone.io/github.com/jochasinga/requests/latest)  [![Coverage Status](https://coveralls.io/repos/github/jochasinga/requests/badge.svg?style=flat)](https://coveralls.io/github/jochasinga/requests?branch=master)
+[![GoDoc](https://godoc.org/github.com/jochasinga/requests?status.svg)](https://godoc.org/github.com/jochasinga/requests)   [![Build Status](https://drone.io/github.com/jochasinga/requests/status.png?style=flat)](https://drone.io/github.com/jochasinga/requests/latest)   [![Coverage Status](https://coveralls.io/repos/github/jochasinga/requests/badge.svg?branch=master)](https://coveralls.io/github/jochasinga/requests?branch=master)
 
 Go HTTP Requests for Rodents (◕ᴥ◕)
 
