@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jochasinga/relay"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -181,7 +182,8 @@ func TestGetAsyncResponseTypeAndContent(t *testing.T) {
 		}))
 
 		latency := time.Duration(1) * time.Second
-		proxy := newProxy(latency, ts)
+		//proxy := newProxy(latency, ts)
+		proxy := relay.NewProxy(latency, ts)
 
 		Convey("WITH data and auth maps", func() {
 			auth := map[string]string{"user": "password"}
