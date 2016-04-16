@@ -9,16 +9,8 @@ import (
 	"time"
 )
 
-// Requests needs to be created to use all the methods.
-type Requests struct {}
-
-// New returns a new *Requests instance
-func New() *Requests {
-	return new(Requests)
-}
-
 func marshalData(data, auth interface{}) (map[string][]byte, error) {
-	
+
 	d, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
@@ -35,7 +27,7 @@ func marshalData(data, auth interface{}) (map[string][]byte, error) {
 
 // Get sends a HTTP GET request to the provided URL with the data and basic authorization
 // maps or structs. It returns *http.Response on success or error.
-func (r *Requests) Get(url string, data, auth interface{}) (*http.Response, error) {
+func Get(url string, data, auth interface{}) (*http.Response, error) {
 
 	results, err := marshalData(data, auth)
 	if err != nil {
@@ -63,19 +55,21 @@ func (r *Requests) Get(url string, data, auth interface{}) (*http.Response, erro
 			return (*http.Response)(nil), err
 		}
 		req.SetBasicAuth(user, pw)
-	}                                                                                         
- 
+	}
+
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return (*http.Response)(nil), err
 	}
-	
+
 	return res, nil
 }
 
 // GetAsync sends a HTTP GET request to the provided URL with data and authorization
 // maps or structs. It returns a chan *http.Response immediately.
-func (r *Requests) GetAsync(url string, data, auth interface{}, timeout time.Duration) (chan *http.Response, error) {
+//func (r *Requests) GetAsync(url string, data, auth interface{}, timeout time.Duration) (chan *http.Response, error) {
+func GetAsync(url string, data, auth interface{}, timeout time.Duration) (chan *http.Response, error) {
+
 	results, err := marshalData(data, auth)
 	if err != nil {
 		return (chan *http.Response)(nil), err
@@ -102,12 +96,12 @@ func (r *Requests) GetAsync(url string, data, auth interface{}, timeout time.Dur
 			return (chan *http.Response)(nil), err
 		}
 		req.SetBasicAuth(user, pw)
-	}                                                                                         
- 	
+	}
+
 	client := &http.Client{Timeout: timeout}
-	
+
 	reschan := make(chan *http.Response, 1)
-	
+
 	go func(c chan *http.Response) error {
 		res, err := client.Do(req)
 		if err != nil {
@@ -116,26 +110,26 @@ func (r *Requests) GetAsync(url string, data, auth interface{}, timeout time.Dur
 		c <- res
 		return nil
 	}(reschan)
-	
+
 	return reschan, nil
 }
 
 // Post sends a HTTP POST request to the provided URL, and encode the data according to
 // the appropriate bodyType.
-func (r *Requests) Post(url, bodyType string, data interface{}) (*http.Response, error) {
-	
+//func (r *Requests) Post(url, bodyType string, data interface{}) (*http.Response, error) {
+func Post(url, bodyType string, data interface{}) (*http.Response, error) {
+
 	dat, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	dataReadCloser := ioutil.NopCloser(bytes.NewBuffer(dat))
 
 	res, err := http.DefaultClient.Post(url, bodyType, dataReadCloser)
 	if err != nil {
 		return (*http.Response)(nil), err
 	}
- 
+
 	return res, nil
 }
-
