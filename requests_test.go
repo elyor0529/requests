@@ -3,9 +3,12 @@ package requests
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 	"time"
 
@@ -13,146 +16,306 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func TestGetResponseTypeAndContent(t *testing.T) {
-	Convey("GIVEN the Server Handler", t, func() {
-		var d map[string]interface{}
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			msg := "Hello, requests"
-			if r.Body != nil {
-				data, err := ioutil.ReadAll(r.Body)
-				if err != nil {
-					t.Error(err)
-				}
+var (
+	//bodyMap = map[string]string{"foo": "bar"}
+	bodyMap   = map[string][]string{"foo": []string{"bar", "baz"}}
+	authMap   = map[string]string{"user": "password"}
+	headerMap = map[string][]string{
+		"Content-Type":    {"application/json"},
+		"Accept-Encoding": {"gzip, deflate"},
+		"Accept-Language": {"en-us"},
+		"Foo":             {"Bar", "two"},
+	}
 
-				if err = json.Unmarshal(data, &d); err != nil {
-					t.Error(err)
-				}
-			}
+	bodyHybridMap = map[string][]interface{}{
+		"duplica": {bodyMap, bodyStruct},
+	}
+	respJSON = []byte(`{"foo": [{"bar", "baz"}]`)
 
-			if len(d) > 0 {
-				for k, _ := range d {
-					msg += ", " + k
-				}
-			}
+	bodyStruct = struct {
+		Foo []string `json:"foo"`
+	}{
+		[]string{"bar", "baz"},
+	}
+	authStruct = struct {
+		User string `json:"user"`
+	}{"password"}
+	headerStruct = struct {
+		ContentType    []string
+		AcceptEncoding []string
+		AcceptLanguage []string
+		Foo            []string
+	}{
+		[]string{"application/json"},
+		[]string{"gzip, deflate"},
+		[]string{"en-us"},
+		[]string{"Bar", "two"},
+	}
+)
 
-			if len(r.Header["Authorization"]) > 0 {
-				msg += ", auth"
-			}
-
-			fmt.Fprintf(w, msg)
-		}))
-
-		Convey("WITH data and auth maps", func() {
-			auth := map[string]string{"user": "pass"}
-			data := map[string][]string{"foo": []string{"bar", "baz"}}
-
-			resp, err := Get(ts.URL, data, auth)
-			if err != nil {
-				t.Error(err)
-			}
-
-			Convey("EXPECT Get() to return *httpResponse", func() {
-				So(resp, ShouldHaveSameTypeAs, &http.Response{})
-			})
-
-			Convey("EXPECT Get() to return correct content", func() {
-				body, err := ioutil.ReadAll(resp.Body)
-				if err != nil {
-					t.Error(err)
-				}
-				defer resp.Body.Close()
-
-				greeting := string(body)
-				So(greeting, ShouldEqual, "Hello, requests, foo, auth")
-			})
-
-		})
-		Convey("WITH data and auth structs", func() {
-			data := struct {
-				Foo []string `json:"foo"`
-			}{[]string{"bar", "baz"}}
-
-			auth := struct {
-				User string `json:"user"`
-			}{"pass"}
-
-			resp, err := Get(ts.URL, data, auth)
-			if err != nil {
-				t.Error(err)
-			}
-			Convey("EXPECT Get() to return *httpResponse", func() {
-				So(resp, ShouldHaveSameTypeAs, &http.Response{})
-
-			})
-			Convey("EXPECT Get() to return correct content", func() {
-				body, err := ioutil.ReadAll(resp.Body)
-				if err != nil {
-					t.Error(err)
-				}
-				defer resp.Body.Close()
-
-				greeting := string(body)
-				So(greeting, ShouldEqual, "Hello, requests, foo, auth")
-			})
-		})
-
-		Convey("WITH data and auth as nil", func() {
-			resp, err := Get(ts.URL, nil, nil)
-			if err != nil {
-				t.Error(err)
-			}
-
-			Convey("EXPECT Get() to return type *httpResponse", func() {
-				So(resp, ShouldHaveSameTypeAs, &http.Response{})
-			})
-
-			Convey("EXPECT Get() to return correct content", func() {
-				body, err := ioutil.ReadAll(resp.Body)
-				if err != nil {
-					t.Error(err)
-				}
-				defer resp.Body.Close()
-
-				greeting := string(body)
-				So(greeting, ShouldEqual, "Hello, requests")
-			})
-		})
-
-		// Edge cases for errors
-		Convey("WITH data as channel", func() {
-			badData := make(chan int)
-			resp, err := Get(ts.URL, badData, nil)
-
-			Convey("EXPECT Get() to return an error", func() {
-				So(resp, ShouldBeNil)
-				So(err, ShouldNotBeNil)
-			})
-		})
-
-		Convey("WITH auth as func()", func() {
-			badAuth := func() {}
-			resp, err := Get(ts.URL, nil, badAuth)
-			Convey("EXPECT Get() to return an error", func() {
-				So(resp, ShouldBeNil)
-				So(err, ShouldNotBeNil)
-			})
-		})
-
-		Convey("WITH malformed URL", func() {
-			badURL := "://maggot.#&"
-			resp, err := Get(badURL, nil, nil)
-
-			Convey("EXPECT Get() to return an error", func() {
-				So(resp, ShouldBeNil)
-				So(err, ShouldNotBeNil)
-			})
-		})
-		Reset(func() {
-			ts.Close()
-		})
-	})
+// Test various patterns of arguments
+// TODO: Add more patterns
+var getTestArgs = [...][]interface{}{
+	[]interface{}{nil, nil},
+	[]interface{}{nil, nil, nil},
+	[]interface{}{nil, authMap},
+	[]interface{}{nil, authStruct},
+	[]interface{}{nil, authMap, headerMap},
+	[]interface{}{nil, authStruct, headerMap},
+	[]interface{}{bodyMap, nil},
+	[]interface{}{bodyMap, nil, nil},
+	[]interface{}{bodyMap, nil, headerMap},
+	[]interface{}{bodyMap, authMap},
+	[]interface{}{bodyMap, authStruct},
+	[]interface{}{bodyStruct, authMap},
+	[]interface{}{bodyHybridMap, authMap},
+	[]interface{}{bodyHybridMap, authStruct},
+	[]interface{}{bodyMap, authMap, headerMap},
+	[]interface{}{bodyMap, authStruct, headerMap},
+	[]interface{}{bodyMap, authStruct, headerStruct},
+	[]interface{}{bodyStruct, authMap, headerMap},
+	[]interface{}{bodyStruct, authStruct, headerMap},
+	[]interface{}{bodyStruct, authStruct, headerStruct},
+	[]interface{}{bodyHybridMap, authMap, headerMap},
+	[]interface{}{bodyHybridMap, authStruct, headerMap},
+	[]interface{}{bodyHybridMap, authStruct, headerStruct},
 }
 
+func helloHandler(w http.ResponseWriter, r *http.Request) {
+	io.WriteString(w, "Hello world!")
+}
+
+func jsonHandler(w http.ResponseWriter, r *http.Request) {
+	data := []byte(`{"foo": ["bar", "baz"]}`)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(data)
+}
+
+// argsHandler writes the body's key if the body exists and
+// "auth" if Authorization key is founded in the requests' header.
+func argsHandler(w http.ResponseWriter, r *http.Request) {
+
+	var data map[string]interface{}
+	var argKeys []string
+
+	if r.Body != nil {
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		log.Print(body)
+
+		if err = json.Unmarshal(body, &data); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}
+
+	if len(data) > 0 {
+		for key := range data {
+			argKeys = append(argKeys, key)
+		}
+	}
+
+	if len(r.Header.Get("Authorization")) > 0 {
+		argKeys = append(argKeys, " bar")
+	}
+
+	for _, v := range argKeys {
+		io.WriteString(w, v)
+	}
+}
+
+func TestGetResponseType(t *testing.T) {
+
+	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
+	defer ts.Close()
+
+	for _, args := range getTestArgs {
+		resp, err := Get(ts.URL, args...)
+		if err != nil {
+			t.Error(err)
+		}
+
+		if reflect.TypeOf(resp) != reflect.TypeOf(&Response{}) {
+			t.Error(err)
+		}
+	}
+}
+
+func TestGetResponse(t *testing.T) {
+
+	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
+	defer ts.Close()
+
+	resp, err := Get(ts.URL)
+	if err != nil {
+		t.Error(err)
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if string(body) != "Hello world!" {
+		log.Println(string(body))
+		t.Error(err)
+	}
+}
+
+func TestGetResponseAsJSON(t *testing.T) {
+
+	ts := httptest.NewServer(http.HandlerFunc(jsonHandler))
+	defer ts.Close()
+
+	resp, err := Get(ts.URL)
+	if err != nil {
+		t.Error(err)
+	}
+
+	jsn := resp.JSON()
+
+	expected := []byte(`{"foo": ["bar", "baz"]}`)
+
+	if !reflect.DeepEqual(jsn, expected) {
+		t.Error(err)
+	}
+}
+
+func TestGetResponseAsText(t *testing.T) {
+
+	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
+	defer ts.Close()
+
+	resp, err := Get(ts.URL)
+	if err != nil {
+		t.Error(err)
+	}
+
+	text := resp.Text()
+
+	expected := "Hello world!"
+
+	if text != expected {
+		t.Error(err)
+	}
+}
+
+var getTestTable = []struct {
+	args     []interface{}
+	expected string
+}{
+	{[]interface{}{nil}, ""},
+	{[]interface{}{bodyMap}, "foo"},
+	{[]interface{}{bodyStruct}, "foo"},
+	{[]interface{}{bodyHybridMap}, "duplica"},
+	{[]interface{}{bodyMap, authMap}, "foo bar"},
+	{[]interface{}{bodyStruct, authMap}, "foo bar"},
+	{[]interface{}{bodyHybridMap, authMap}, "duplica bar"},
+}
+
+func TestGetArgsConcatInResponse(t *testing.T) {
+
+	ts := httptest.NewServer(http.HandlerFunc(argsHandler))
+	defer ts.Close()
+
+	for _, tt := range getTestTable {
+
+		resp, err := Get(ts.URL, tt.args...)
+		if err != nil {
+			t.Error(err)
+		}
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Error(err)
+		}
+
+		if string(body) != tt.expected {
+			log.Printf("[ACTUAL]: %v\n", string(body))
+			log.Printf("[EXPECTED]: %v\n", tt.expected)
+			t.Error(err)
+		}
+	}
+}
+
+var (
+	badURLs = []string{
+		"://maggot.#&",
+		"crap://bs.com",
+		"htp://f#as3",
+	}
+	badArgs = []interface{}{
+		make(chan int),
+		func() {},
+		12i,
+	}
+)
+
+func TestGetWithBadURLs(t *testing.T) {
+
+	for _, url := range badURLs {
+		_, err := Get(url)
+		if err == nil {
+			t.Error(err)
+		}
+	}
+}
+
+func TestGetWithBadData(t *testing.T) {
+
+	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
+	defer ts.Close()
+
+	for _, arg := range badArgs {
+		_, err := Get(ts.URL, arg)
+		if err == nil {
+			t.Error(err)
+		}
+	}
+}
+
+func TestGetWithBadAuth(t *testing.T) {
+
+	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
+	defer ts.Close()
+
+	for _, arg := range badArgs {
+		_, err := Get(ts.URL, nil, arg)
+		if err == nil {
+			t.Error(err)
+		}
+	}
+}
+
+func TestGetWithBadHeader(t *testing.T) {
+
+	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
+	defer ts.Close()
+
+	for _, arg := range badArgs {
+		_, err := Get(ts.URL, nil, nil, arg)
+		if err == nil {
+			t.Error(err)
+		}
+	}
+}
+
+func TestGetWithForthArgs(t *testing.T) {
+
+	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
+	defer ts.Close()
+
+	extra := map[string]string{"foo": "bar"}
+
+	_, err := Get(ts.URL, nil, nil, nil, extra)
+	if err == nil {
+		t.Error(err)
+	}
+}
+
+// TODO: Change to standard tests
 func TestGetAsyncResponseTypeAndContent(t *testing.T) {
 	Convey("GIVEN the Server Handler with delay proxy", t, func() {
 
@@ -182,7 +345,6 @@ func TestGetAsyncResponseTypeAndContent(t *testing.T) {
 		}))
 
 		latency := time.Duration(1) * time.Second
-		//proxy := newProxy(latency, ts)
 		proxy := relay.NewProxy(latency, ts)
 
 		Convey("WITH data and auth maps", func() {
