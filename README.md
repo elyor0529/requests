@@ -6,8 +6,7 @@ Go HTTP Requests for Rodents (◕ᴥ◕)
 
 Why Another HTTP Package?
 -------------------------
-Go's very own `net/http` has it all for making HTTP requests. However, `requests` wants to help
-make REST calls more declarative. It is safe for all [rodents](http://www.styletails.com/wp-content/uploads/2014/06/guinea-pig-booboo-lieveheersbeestje-2.jpg), not just gophers.
+This is Go's [net/http](https://golang.org/pkg/net/http/) on steroid for making high-level HTTP requests to REST services more declarative. It is safe for all [rodents](http://www.styletails.com/wp-content/uploads/2014/06/guinea-pig-booboo-lieveheersbeestje-2.jpg) , not just gophers.
 
 Install
 -------
@@ -23,7 +22,7 @@ Examples
 
 (*Error handling omitted for brevity.*)
 
-A basic GET request:
+### Sending GET requests
 
 ```go
 import (
@@ -38,7 +37,7 @@ func main() {
 }
 ```
 
-Additional data with request:
+Additional data:
 
 ```go
 
@@ -47,11 +46,14 @@ res, err := requests.Get("http://httpbin.org/get", data)
 
 ```
 
-It isn't common to pass data with GET. However, in some REST endpoints,
-i.e. Elasticsearch with which this package was initially written to interact,
-JSON data is expected with the request as a DSL for querying.
 
-Basic auth can also be sent as an argument:
+>> Note that [it is not common to pass data with GET request](http://stackoverflow.com/questions/978061/http-get-with-request-body). However,
+[some services](http://stackoverflow.com/questions/14339696/elasticsearch-post-with-json-search-body-vs-get-with-json-in-url) expect a JSON body with GET request as a [DSL](https://en.wikipedia.org/wiki/Domain-specific_language) for i.e. results querying, which is often more
+convenient than passing long query parameters in the URL. It is generally a better idea
+to use POST when trying to pass data to the server, and in fact I will deprecate
+the body argument in the `Get()` method soon.    
+
+Basic auth can also be sent:
 
 ```go
 
@@ -69,11 +71,14 @@ headers := map[string][]string{
 	"Content-Type": {"application/json"},
 	"Accept": {"text/html"},
 }
+
 res, err := requests.Get("http://httpbin.org/get", nil, nil, headers)
 
 ```
 
-Data can be anything JSON-marshalable (map[string]interface{} or struct).
+### Sending POST requests
+
+Data can be anything JSON-marshalable (map and struct).
 
 ```go
 
@@ -81,65 +86,75 @@ data1 := map[string][]string{"foo": []string{"bar", "baz"}}
 data2 := struct {
 	Foo []string `json:"foo"`
 }{[]string{"bar", "baz"}}
-combined := map[string][]interface{}{
-	"twins": {data1, data2},
+data := map[string][]interface{}{
+	"combined": {data1, data2},
 }
 
-res, err := requests.Post("https://httpbin.org/post", "application/json", combined)
+res, err := requests.Post("https://httpbin.org/post", "application/json", data)
 
 ```
 
-GetAsync transparently returns a channel, on which you can wait for the response.
+### Asynchronous Requests
+
+`GetAsync` transparently returns a channel, on which you can wait for the response.
 
 ```go
 
 timeout := time.Duration(1) * time.Second
-rc, err := rq.GetAsync("https://golang.org", nil, nil, timeout)
 
-// Do some other things
+rc, err := requests.GetAsync("https://golang.org", nil, nil, timeout)
+
+// Do other things
 
 res := <-rc
 fmt.Println(res.StatusCode)  // 200
 
 ```
-Or use `select` to poll many channels asynchronously.
+Or use `select` to poll channels asynchronously.
 
 ```go
 
-res1, _ := rq.GetAsync("http://google.com", nil, nil, timeout)
-res2, _ := rq.GetAsync("http://facebook.com", nil, nil, timeout)
-res3, _ := rq.GetAsync("http://docker.com", nil, nil, timeout)
+res1, _ := requests.GetAsync("http://google.com", nil, nil, timeout)
+res2, _ := requests.GetAsync("http://facebook.com", nil, nil, timeout)
+res3, _ := requests.GetAsync("http://docker.com", nil, nil, timeout)
 
 for i := 0; i < 3; i++ {
         select {
 	    case r1 := <-res1:
-		        fmt.Println(r1.Status)
+		        fmt.Println(r1.StatusCode)
 	    case r2 := <-res2:
 		        fmt.Println(r2.StatusCode)
 	    case r3 := <-res3:
-		        fmt.Println(r3.Body)
+		        fmt.Println(r3.StatusCode)
 		}
 }
 
 ```
 
-*TODO: `requests.Pool` coming soon*
+>> TODO: `requests.Pool` coming soon
 
-Also check out my other project [relay](https://github.com/jochasinga/relay),
+Awesome HTTP Tests
+------------------
+Check out my other project [relay](https://github.com/jochasinga/relay),
 which is useful for end-to-end HTTP tests.
 
-requests.Response
------------------
-Response returned is a special kind of `*requests.Response`, which wraps
-around `*http.Response` to provide more methods such as `Len(), ``String()`,
-`Content()`, and `JSON()`.
+[requests.Response](https://godoc.org/github.com/jochasinga/requests#Response)
+------------------------------------------------------------------------------
+The response returned has the type [*requests.Response](https://godoc.org/github.com/jochasinga/requests#Response),
+which embeds [*http.Response](https://golang.org/pkg/net/http/#Response) type
+to provide more buffer-like methods such as:
 
-### Len() ###
++ `Len()`
++ `String()`
++ `Bytes()`
++ `JSON()`
+
+### Len()
 Returns the body's length.
 
 ```go
 
-len := res.Len()
+var len int = res.Len()
 
 ```
 
@@ -148,34 +163,34 @@ Returns the body as a string.
 
 ```go
 
-text := res.String()
+var text string = res.String()
 
 ```
 
-### Content() ###
+### Bytes()
 Returns the body as bytes.
 
 ```go
 
-content := res.Content()
+var content []byte = res.Bytes()
 
 ```
 
-### JSON() ###
-Like `Content()`, but returns the body as bytes only if `Content-Type` is set
-to `application/json` in the response's header. Otherwise, it returns empty `[]byte`.
-
+### JSON()
+Like `Bytes()` but returns an empty `[]byte` unless `Content-Type` is set
+to `application/json` in the response's header.
 
 ```go
 
-jsn := res.JSON()
+var jsn []byte = res.JSON()
 
 ```
 
-These special methods use `bytes.Buffer` under the hood, so they all returns
-"unread" portion of data. Make sure not to read from the data before using.
+These special methods use [bytes.Buffer](https://golang.org/pkg/bytes/#Buffer)
+under the hood, thus unread portions of data are returned. Make sure not to read
+from the response's body beforehand.
 
 Donate
 ------
 I am currently working on this project alongside some other ideas to meet
-ends in NYC unemployed. Please consider [![Flattr this git repo](http://api.flattr.com/button/flattr-badge-large.png)](https://flattr.com/submit/auto?user_id=jochasinga&url=https://github.com/jochasinga/requests&title=Relay&language=English&tags=github&category=software) to fuel me with proper coffee.
+ends in NYC **unemployed**. Please consider [![Flattr this git repo](http://api.flattr.com/button/flattr-badge-large.png)](https://flattr.com/submit/auto?user_id=jochasinga&url=https://github.com/jochasinga/requests&title=Relay&language=English&tags=github&category=software) to fuel me with proper coffee.

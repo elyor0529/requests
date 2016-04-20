@@ -17,7 +17,7 @@ type HTTPResponse interface {
 	Location() (*url.URL, error)
 	ProtoAtLeast(major, minor int) bool
 	Write(w io.Writer) error
-	Content() []byte
+	Bytes() []byte
 	String() string
 	JSON() []byte
 	Len() int
@@ -52,9 +52,9 @@ func (r *Response) String() (body string) {
 	return
 }
 
-// Content returns the response's Body as []byte. Any errors
+// Bytes returns the response's Body as []byte. Any errors
 // reading from the body is ignored for convenience.
-func (r *Response) Content() (content []byte) {
+func (r *Response) Bytes() (content []byte) {
 
 	defer r.Body.Close()
 	buf := new(bytes.Buffer)
@@ -64,13 +64,13 @@ func (r *Response) Content() (content []byte) {
 	return
 }
 
-// JSON returns a JSON []byte from the response's body, provided the
-// Content-Type is set as "application/json" in the response's header.
+// JSON, like Bytes() but returns an empty []bytes "Content-Type" is set to
+// "application/json" in the response's header.
 func (r *Response) JSON() (jsn []byte) {
 
 	for _, arg := range r.Header["Content-Type"] {
 		if arg == "application/json" {
-			jsn = r.Content()
+			jsn = r.Bytes()
 			return
 		}
 	}
@@ -82,10 +82,8 @@ func (r *Response) JSON() (jsn []byte) {
 	return
 }
 
-// Get sends a HTTP GET request to the provided URL with the data and basic authorization
-// maps or structs. It returns *http.Response on success or error.
-// Get accepts arguments in the followering order--urlStr, body, auth, and header.
-// Only the urlStr is needed to send a request.
+// Get sends a HTTP GET request to the provided URL with the optional body,
+// basic auth, and custom headers.
 func Get(urlStr string, args ...interface{}) (*Response, error) {
 
 	results, err := marshalGet(args)
@@ -157,7 +155,6 @@ func Get(urlStr string, args ...interface{}) (*Response, error) {
 
 // GetAsync sends a HTTP GET request to the provided URL with data and authorization
 // maps or structs. It returns a chan *http.Response immediately.
-//func (r *Requests) GetAsync(url string, data, auth interface{}, timeout time.Duration) (chan *http.Response, error) {
 func GetAsync(url string, data, auth interface{}, timeout time.Duration) (chan *http.Response, error) {
 
 	results, err := marshalData(data, auth)
@@ -206,7 +203,6 @@ func GetAsync(url string, data, auth interface{}, timeout time.Duration) (chan *
 
 // Post sends a HTTP POST request to the provided URL, and encode the data according to
 // the appropriate bodyType.
-//func (r *Requests) Post(url, bodyType string, data interface{}) (*http.Response, error) {
 func Post(url, bodyType string, data interface{}) (*http.Response, error) {
 
 	dat, err := json.Marshal(data)

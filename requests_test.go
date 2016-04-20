@@ -22,22 +22,19 @@ var (
 	bodyMap   = map[string][]string{"foo": []string{"bar", "baz"}}
 	authMap   = map[string]string{"user": "password"}
 	headerMap = map[string][]string{
-		"Content-Type":    {"application/json"},
 		"Accept-Encoding": {"gzip, deflate"},
 		"Accept-Language": {"en-us"},
+		"Content-Type":    {"application/json"},
 		"Foo":             {"Bar", "two"},
 	}
 
 	bodyHybridMap = map[string][]interface{}{
 		"duplica": {bodyMap, bodyStruct},
 	}
-	respJSON = []byte(`{"foo": [{"bar", "baz"}]`)
-
+	respJSON   = []byte(`{"foo": [{"bar", "baz"}]`)
 	bodyStruct = struct {
 		Foo []string `json:"foo"`
-	}{
-		[]string{"bar", "baz"},
-	}
+	}{[]string{"bar", "baz"}}
 	authStruct = struct {
 		User string `json:"user"`
 	}{"password"}
@@ -162,7 +159,7 @@ func TestGetResponseAsBytes(t *testing.T) {
 		t.Error(err)
 	}
 
-	result := resp.Content()
+	result := resp.Bytes()
 	expected := []byte("Hello world!")
 
 	if !reflect.DeepEqual(result, expected) {
