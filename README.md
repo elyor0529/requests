@@ -42,12 +42,13 @@ Additional data:
 ```go
 
 data := map[string][]string{"foo": ["bar", "baz"]}
+
 res, err := requests.Get("http://httpbin.org/get", data)
 
 ```
 
 
->> Note that [it is not common to pass data with GET request](http://stackoverflow.com/questions/978061/http-get-with-request-body). However,
+> Note that [it is not common to pass data with GET request](http://stackoverflow.com/questions/978061/http-get-with-request-body). However,
 [some services](http://stackoverflow.com/questions/14339696/elasticsearch-post-with-json-search-body-vs-get-with-json-in-url) expect a JSON body with GET request as a [DSL](https://en.wikipedia.org/wiki/Domain-specific_language) for i.e. results querying, which is often more
 convenient than passing long query parameters in the URL. It is generally a better idea
 to use POST when trying to pass data to the server, and in fact I will deprecate
@@ -58,6 +59,7 @@ Basic auth can also be sent:
 ```go
 
 auth := map[string]string{"user": "password"}
+
 res, err := requests.Get("http://httpbin.org/get", nil, auth)
 
 ```
@@ -83,12 +85,8 @@ Data can be anything JSON-marshalable (map and struct).
 ```go
 
 data1 := map[string][]string{"foo": []string{"bar", "baz"}}
-data2 := struct {
-	Foo []string `json:"foo"`
-}{[]string{"bar", "baz"}}
-data := map[string][]interface{}{
-	"combined": {data1, data2},
-}
+data2 := struct {Foo []string `json:"foo"`}{[]string{"bar", "baz"}}
+data := map[string][]interface{}{"combined": {data1, data2}}
 
 res, err := requests.Post("https://httpbin.org/post", "application/json", data)
 
@@ -131,7 +129,7 @@ for i := 0; i < 3; i++ {
 
 ```
 
->> TODO: `requests.Pool` coming soon
+> TODO: `requests.Pool` coming soon
 
 Awesome HTTP Tests
 ------------------
@@ -154,7 +152,7 @@ Returns the body's length.
 
 ```go
 
-var len int = res.Len()
+var len = res.Len()
 
 ```
 
@@ -190,7 +188,8 @@ These special methods use [bytes.Buffer](https://golang.org/pkg/bytes/#Buffer)
 under the hood, thus unread portions of data are returned. Make sure not to read
 from the response's body beforehand.
 
-Donate
-------
-I am currently working on this project alongside some other ideas to meet
-ends in NYC **unemployed**. Please consider [![Flattr this git repo](http://api.flattr.com/button/flattr-badge-large.png)](https://flattr.com/submit/auto?user_id=jochasinga&url=https://github.com/jochasinga/requests&title=Relay&language=English&tags=github&category=software) to fuel me with proper coffee.
+Disclaimer
+----------
+This project is very young but growing everyday since I am currently working on
+this project alongside some other ideas **unemployed**. To support my ends in NYC
+and help me push commits, please consider [![Flattr this git repo](http://api.flattr.com/button/flattr-badge-large.png)](https://flattr.com/submit/auto?user_id=jochasinga&url=https://github.com/jochasinga/requests&title=Relay&language=English&tags=github&category=software) to fuel me with calming oolong 🍵 or 🌟 this repo for spiritual octane.
