@@ -18,8 +18,9 @@ type HTTPResponse interface {
 	ProtoAtLeast(major, minor int) bool
 	Write(w io.Writer) error
 	Content() []byte
-	Text() string
+	String() string
 	JSON() []byte
+	Len() int
 }
 
 // Response is a *http.Response and implements HTTPResponse.
@@ -27,31 +28,38 @@ type Response struct {
 	*http.Response
 }
 
-// Text returns the response's body as string.
-func (r *Response) Text() (body string) {
+// Len returns the response's body's unread portion's length,
+// which is the full length provided it has not been read.
+func (r *Response) Len() (len int) {
 
-	if r.Body != nil {
-		bodyByte, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			return
-		}
-		body = string(bodyByte)
-	}
+	defer r.Body.Close()
+	buf := new(bytes.Buffer)
+	_, _ = buf.ReadFrom(r.Body)
+	len = buf.Len()
 
 	return
 }
 
-// Content returns the response's body as []byte.
+// String returns the response's body as string. Any errors
+// reading from the body is ignored for convenience.
+func (r *Response) String() (body string) {
+
+	defer r.Body.Close()
+	buf := new(bytes.Buffer)
+	_, _ = buf.ReadFrom(r.Body)
+	body = buf.String()
+
+	return
+}
+
+// Content returns the response's Body as []byte. Any errors
+// reading from the body is ignored for convenience.
 func (r *Response) Content() (content []byte) {
 
-	if r.Body != nil {
-		b, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			return
-		}
-		defer r.Body.Close()
-		content = b
-	}
+	defer r.Body.Close()
+	buf := new(bytes.Buffer)
+	_, _ = buf.ReadFrom(r.Body)
+	content = buf.Bytes()
 
 	return
 }
@@ -86,11 +94,11 @@ func Get(urlStr string, args ...interface{}) (*Response, error) {
 	}
 
 	// Body
-	body := results["body"]
-
 	var bodyStream io.ReadCloser
 
-	if len(body) > 0 {
+	if len(results["body"]) > 0 {
+
+		body := results["body"]
 		bodyStream = ioutil.NopCloser(bytes.NewBuffer(body))
 	}
 
@@ -99,16 +107,17 @@ func Get(urlStr string, args ...interface{}) (*Response, error) {
 		return nil, err
 	}
 
-	// auth
-	auth := results["auth"]
+	// Basic Auth
+	if len(results["auth"]) > 0 {
 
-	var authData map[string]interface{}
+		var authData map[string]interface{}
 
-	if auth != nil {
+		auth := results["auth"]
 		err = json.Unmarshal(auth, &authData)
 		if err != nil {
 			return nil, err
 		}
+
 		for usr, pw := range authData {
 			password, ok := pw.(string)
 			if !ok {
@@ -119,16 +128,17 @@ func Get(urlStr string, args ...interface{}) (*Response, error) {
 		}
 	}
 
-	// WATCH: header
-	header := results["header"]
+	// Custom headers
+	if len(results["header"]) > 0 {
 
-	var headerData http.Header
+		var headerData http.Header
 
-	if header != nil {
-		err = json.Unmarshal(header, &headerData)
+		headers := results["header"]
+		err = json.Unmarshal(headers, &headerData)
 		if err != nil {
 			return nil, err
 		}
+
 		req.Header = headerData
 	}
 

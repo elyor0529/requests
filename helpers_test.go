@@ -1,11 +1,70 @@
 package requests
 
-/*
+import (
+	"errors"
+	"log"
+	"reflect"
+	"testing"
+)
+
 var (
 	getURL  = "http://httpbin.org/get"
 	postURL = "http://httpbin.org/post"
+	body    = map[string]string{"foo": "bar"}
+	auth    = map[string]string{"user": "pass"}
+	header  = map[string][]string{"Accept": {"text/plain"}}
 )
 
+var marshalGetTestTable = []struct {
+	args     []interface{}
+	expected map[string][]byte
+}{
+	{[]interface{}{}, map[string][]byte{}},
+	{[]interface{}{nil}, map[string][]byte{}},
+	{[]interface{}{nil, nil}, map[string][]byte{}},
+	{[]interface{}{nil, nil, nil}, map[string][]byte{}},
+
+	{[]interface{}{body}, map[string][]byte{
+		"body": []byte(`{"foo":"bar"}`),
+	}},
+	{[]interface{}{nil, auth}, map[string][]byte{
+		"auth": []byte(`{"user":"pass"}`),
+	}},
+	{[]interface{}{body, auth}, map[string][]byte{
+		"body": []byte(`{"foo":"bar"}`),
+		"auth": []byte(`{"user":"pass"}`),
+	}},
+	{[]interface{}{body, auth, nil}, map[string][]byte{
+		"body": []byte(`{"foo":"bar"}`),
+		"auth": []byte(`{"user":"pass"}`),
+	}},
+	{[]interface{}{body, auth, header}, map[string][]byte{
+		"body":   []byte(`{"foo":"bar"}`),
+		"auth":   []byte(`{"user":"pass"}`),
+		"header": []byte(`{"Accept":["text/plain"]}`),
+	}},
+}
+
+func TestMarshalGet(t *testing.T) {
+
+	e := errors.New("Unexpected result!")
+
+	for _, tt := range marshalGetTestTable {
+		result, err := marshalGet(tt.args)
+		if err != nil {
+			t.Error(err)
+		}
+
+		if !reflect.DeepEqual(result, tt.expected) {
+			log.Printf("Result is %v", result)
+			log.Printf("Expected is %v", tt.expected)
+			t.Error(e)
+		}
+
+	}
+}
+
+/*
 var marshalAllTable1 = []struct {
 	method   string
 	expected map[string][]byte

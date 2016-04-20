@@ -73,25 +73,31 @@ func marshalGet(args []interface{}) (map[string][]byte, error) {
 	for i, arg := range args {
 		switch i {
 		case 0:
-			body, err := json.Marshal(arg)
-			if err != nil {
-				return nil, err
+			if arg != nil {
+				body, err := json.Marshal(arg)
+				if err != nil {
+					return nil, err
+				}
+				res["body"] = body
 			}
-			res["body"] = body
 		case 1:
-			auth, err := json.Marshal(arg)
-			if err != nil {
-				return nil, err
+			if arg != nil {
+				auth, err := json.Marshal(arg)
+				if err != nil {
+					return nil, err
+				}
+				res["auth"] = auth
 			}
-			res["auth"] = auth
 		case 2:
-			header, err := json.Marshal(arg)
-			if err != nil {
-				return nil, err
+			if arg != nil {
+				header, err := json.Marshal(arg)
+				if err != nil {
+					return nil, err
+				}
+				res["header"] = header
 			}
-			res["header"] = header
 		default:
-			return nil, errors.New("Expected 3 arguments: Get more.")
+			return nil, errors.New("Expected 3 arguments: Got more.")
 		}
 	}
 

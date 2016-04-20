@@ -1,3 +1,5 @@
+// TODO: Break tests into multiple files.
+// TODO: Change from Goconvey to standard tests.
 package requests
 
 import (
@@ -17,7 +19,6 @@ import (
 )
 
 var (
-	//bodyMap = map[string]string{"foo": "bar"}
 	bodyMap   = map[string][]string{"foo": []string{"bar", "baz"}}
 	authMap   = map[string]string{"user": "password"}
 	headerMap = map[string][]string{
@@ -96,33 +97,20 @@ func jsonHandler(w http.ResponseWriter, r *http.Request) {
 func argsHandler(w http.ResponseWriter, r *http.Request) {
 
 	var data map[string]interface{}
-	var argKeys []string
 
-	if r.Body != nil {
-		body, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-
-		log.Print(body)
-
-		if err = json.Unmarshal(body, &data); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err == io.EOF {
+		io.WriteString(w, "nada")
 	}
 
 	if len(data) > 0 {
 		for key := range data {
-			argKeys = append(argKeys, key)
+			io.WriteString(w, key)
 		}
 	}
 
-	if len(r.Header.Get("Authorization")) > 0 {
-		argKeys = append(argKeys, " bar")
-	}
-
-	for _, v := range argKeys {
-		io.WriteString(w, v)
+	if len(r.Header["Authorization"]) > 0 {
+		io.WriteString(w, "authy")
 	}
 }
 
@@ -164,6 +152,24 @@ func TestGetResponse(t *testing.T) {
 	}
 }
 
+func TestGetResponseAsBytes(t *testing.T) {
+
+	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
+	defer ts.Close()
+
+	resp, err := Get(ts.URL)
+	if err != nil {
+		t.Error(err)
+	}
+
+	result := resp.Content()
+	expected := []byte("Hello world!")
+
+	if !reflect.DeepEqual(result, expected) {
+		t.Error(err)
+	}
+}
+
 func TestGetResponseAsJSON(t *testing.T) {
 
 	ts := httptest.NewServer(http.HandlerFunc(jsonHandler))
@@ -174,16 +180,15 @@ func TestGetResponseAsJSON(t *testing.T) {
 		t.Error(err)
 	}
 
-	jsn := resp.JSON()
-
+	result := resp.JSON()
 	expected := []byte(`{"foo": ["bar", "baz"]}`)
 
-	if !reflect.DeepEqual(jsn, expected) {
+	if !reflect.DeepEqual(result, expected) {
 		t.Error(err)
 	}
 }
 
-func TestGetResponseAsText(t *testing.T) {
+func TestGetResponseAsString(t *testing.T) {
 
 	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
 	defer ts.Close()
@@ -193,11 +198,11 @@ func TestGetResponseAsText(t *testing.T) {
 		t.Error(err)
 	}
 
-	text := resp.Text()
+	result := resp.String()
 
 	expected := "Hello world!"
 
-	if text != expected {
+	if result != expected {
 		t.Error(err)
 	}
 }
@@ -206,13 +211,13 @@ var getTestTable = []struct {
 	args     []interface{}
 	expected string
 }{
-	{[]interface{}{nil}, ""},
+	{[]interface{}{}, "nada"},
+	{[]interface{}{nil}, "nada"},
 	{[]interface{}{bodyMap}, "foo"},
-	{[]interface{}{bodyStruct}, "foo"},
 	{[]interface{}{bodyHybridMap}, "duplica"},
-	{[]interface{}{bodyMap, authMap}, "foo bar"},
-	{[]interface{}{bodyStruct, authMap}, "foo bar"},
-	{[]interface{}{bodyHybridMap, authMap}, "duplica bar"},
+	{[]interface{}{nil, authMap}, "nadaauthy"},
+	{[]interface{}{bodyMap, authMap}, "fooauthy"},
+	{[]interface{}{bodyHybridMap, authMap}, "duplicaauthy"},
 }
 
 func TestGetArgsConcatInResponse(t *testing.T) {
