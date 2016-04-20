@@ -7,86 +7,98 @@ Go HTTP Requests for Rodents (◕ᴥ◕)
 Why Another HTTP Package?
 -------------------------
 Go's very own `net/http` has it all for making HTTP requests. However, `requests` wants to help
-make REST calls more declarative. This means you don't have to deal with `net/http` types
-and those types headaches are usually made of (such as `io.Reader` and `io.ReadCloser`).
-It is safe for all [rodents](http://www.styletails.com/wp-content/uploads/2014/06/guinea-pig-booboo-lieveheersbeestje-2.jpg), not just gophers.
+make REST calls more declarative. It is safe for all [rodents](http://www.styletails.com/wp-content/uploads/2014/06/guinea-pig-booboo-lieveheersbeestje-2.jpg), not just gophers.
 
 Install
 -------
 
 ```bash
 
-$ go get github.com/jochasinga/requests
+go get github.com/jochasinga/requests
 
 ```
 
 Examples
 --------
 
-(*Error handling is omitted for brevity.*)
+(*Error handling omitted for brevity.*)
 
-Send a common GET request just like you'd do with `http.Get`.
+A basic GET request:
 
 ```go
 import (
-	rq "github.com/jochasinga/requests"
+	"github.com/jochasinga/requests"
 )
 
 func main() {
-	res, err := rq.Get("http://httpbin.org/get")
+
+	res, err := requests.Get("http://httpbin.org/get")
+
 	fmt.Println(res.StatusCode)  // 200
 }
 ```
 
-You can send an additional data with your request.
+Additional data with request:
 
 ```go
 
 data := map[string][]string{"foo": ["bar", "baz"]}
-res, err := rq.Get("http://httpbin.org/get", data)
+res, err := requests.Get("http://httpbin.org/get", data)
 
 ```
 
-To pass a basic auth with your request, just create an auth map like this:
+It isn't common to pass data with GET. However, in some REST endpoints,
+i.e. Elasticsearch with which this package was initially written to interact,
+JSON data is expected with the request as a DSL for querying.
+
+Basic auth can also be sent as an argument:
 
 ```go
 
 auth := map[string]string{"user": "password"}
-res, err := rq.Get("http://httpbin.org/get", nil, auth)
+res, err := requests.Get("http://httpbin.org/get", nil, auth)
 
 ```
 
-You can create a custom header the same way.
+For custom headers, it's best to create a `map[string][]string`
+which adheres to the structure of `http.Header`:
 
 ```go
 
-header := map[string][]string{"Content-Type": []{"application/json"}}
-res, err := rq.Get("http://httpbin.org/get", nil, nil, header)
+headers := map[string][]string{
+	"Content-Type": {"application/json"},
+	"Accept": {"text/html"},
+}
+res, err := requests.Get("http://httpbin.org/get", nil, nil, headers)
 
 ```
 
-Data can be an array, slice, map, or struct.
+Data can be anything JSON-marshalable (map[string]interface{} or struct).
 
 ```go
 
-data := struct {
-	foo []string
-}{[]string{ "bar", "baz" }}
+data1 := map[string][]string{"foo": []string{"bar", "baz"}}
+data2 := struct {
+	Foo []string `json:"foo"`
+}{[]string{"bar", "baz"}}
+combined := map[string][]interface{}{
+	"twins": {data1, data2},
+}
 
-res, _ := rq.Post("https://httpbin.org/post", "application/json", data)
+res, err := requests.Post("https://httpbin.org/post", "application/json", combined)
 
 ```
 
-`GetAsync` transparently returns a channel, on which you can wait for the response.
+GetAsync transparently returns a channel, on which you can wait for the response.
 
 ```go
 
 timeout := time.Duration(1) * time.Second
-resChan, _ := rq.GetAsync("https://golang.org", nil, nil, timeout)
+rc, err := rq.GetAsync("https://golang.org", nil, nil, timeout)
 
 // Do some other things
 
-res := <-resChan
+res := <-rc
 fmt.Println(res.StatusCode)  // 200
 
 ```
@@ -113,30 +125,35 @@ for i := 0; i < 3; i++ {
 
 *TODO: `requests.Pool` coming soon*
 
-You can also check out [relay](https://github.com/jochasinga/relay), which is
-useful for testing timeouts in HTTP requests.
+Also check out my other project [relay](https://github.com/jochasinga/relay),
+which is useful for end-to-end HTTP tests.
 
 requests.Response
 -----------------
 Response returned is a special kind of `*requests.Response`, which wraps
-around `*http.Response` to provide more methods such as `Text()`, `Content()`,
-and `JSON()`.
+around `*http.Response` to provide more methods such as `Len(), ``String()`,
+`Content()`, and `JSON()`.
 
-
-### Text() ###
-
-`Text()` returns the response's body as a string. It returns an empty string
-if the body is `nil`.
+### Len() ###
+Returns the body's length.
 
 ```go
-text := res.Text()
+
+len := res.Len()
+
+```
+
+### String() ###
+Returns the body as a string.
+
+```go
+
+text := res.String()
 
 ```
 
 ### Content() ###
-
-`Content()` returns the response's body as `[]byte`. It returns an empty `[]byte`
-if the body is `nil`.
+Returns the body as bytes.
 
 ```go
 
@@ -145,9 +162,9 @@ content := res.Content()
 ```
 
 ### JSON() ###
+Like `Content()`, but returns the body as bytes only if `Content-Type` is set
+to `application/json` in the response's header. Otherwise, it returns empty `[]byte`.
 
-If one of the `Content-Type` is set to `application/json` in the response's header,
-you can get the response as a JSON `[]byte`, else it returns an empty `[]byte`.
 
 ```go
 
@@ -155,8 +172,10 @@ jsn := res.JSON()
 
 ```
 
+These special methods use `bytes.Buffer` under the hood, so they all returns
+"unread" portion of data. Make sure not to read from the data before using.
+
 Donate
 ------
-I am currently unemployed, working on this project alongside some others meeting
-ends and expecting first child. If you find this project useful in any way or would
-like to support, please [![Flattr this git repo](http://api.flattr.com/button/flattr-badge-large.png)](https://flattr.com/submit/auto?user_id=jochasinga&url=https://github.com/jochasinga/requests&title=Relay&language=English&tags=github&category=software) me.
+I am currently working on this project alongside some other ideas to meet
+ends in NYC unemployed. Please consider [![Flattr this git repo](http://api.flattr.com/button/flattr-badge-large.png)](https://flattr.com/submit/auto?user_id=jochasinga&url=https://github.com/jochasinga/requests&title=Relay&language=English&tags=github&category=software) to fuel me with proper coffee.
