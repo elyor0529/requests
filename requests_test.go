@@ -317,6 +317,81 @@ func TestGetWithForthArgs(t *testing.T) {
 	}
 }
 
+var getSyncTestTable = []struct {
+	delay    int
+	expected int
+}{
+	{1, 2},
+	{2, 4},
+	{3, 6},
+	{4, 8},
+}
+
+func logElapsedTime(elapsed, expected time.Duration) {
+	log.Printf("Elapsed: %v\n", elapsed)
+	log.Printf("Expected: %v\n", expected)
+}
+
+// Get should wait for the response and return
+func TestGetResponseTimes(t *testing.T) {
+
+	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
+	defer ts.Close()
+
+	for _, tt := range getSyncTestTable {
+
+		delay := time.Duration(tt.delay) * time.Second
+		expected := time.Duration(tt.expected) * time.Second
+		p := relay.NewProxy(delay, ts)
+
+		start := time.Now()
+		_, _ = Get(p.URL)
+		elapsed := time.Since(start)
+
+		logElapsedTime(elapsed, expected)
+
+		if elapsed <= expected {
+			t.Error("Client returned before it should.")
+		}
+	}
+}
+
+var getAsyncTestTable = []struct {
+	delay    int
+	expected int
+}{
+	{1, 0},
+	{2, 0},
+	{3, 0},
+	{4, 0},
+}
+
+// GetAsync should return immediately.
+func TestGetAsyncResponseTimes(t *testing.T) {
+
+	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
+	defer ts.Close()
+
+	deviation := time.Duration(10) * time.Millisecond
+
+	for _, tt := range getSyncTestTable {
+
+		delay := time.Duration(tt.delay) * time.Second
+		expected := time.Duration(tt.expected)*time.Second + deviation
+		p := relay.NewProxy(delay, ts)
+
+		start := time.Now()
+		_, _ = GetAsync(p.URL, nil, nil, 0)
+		elapsed := time.Since(start)
+
+		logElapsedTime(elapsed, expected)
+
+		if elapsed >= expected {
+			t.Error("Client takes too long to be asynchronous.")
+		}
+	}
+}
+
 // TODO: Change to standard tests
 func TestGetAsyncResponseTypeAndContent(t *testing.T) {
 	Convey("GIVEN the Server Handler with delay proxy", t, func() {
