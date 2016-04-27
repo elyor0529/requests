@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+
+	"github.com/jochasinga/req/requests/gtime"
 )
 
 func marshalData(data, auth interface{}) (map[string][]byte, error) {
@@ -138,7 +140,7 @@ func marshalGetAll(args []interface{}) (map[string]interface{}, error) {
 				if !ok {
 					panic(errors.New("Mismatched type: timeout. Expect `float64`"))
 				}
-				res["timeout"] = Ftos(sec)
+				res["timeout"] = gtime.Ftos(sec)
 			}
 		default:
 			panic(errors.New("Mismatched number of arguments."))
