@@ -71,9 +71,10 @@ func (r *Response) JSON() (jsn []byte) {
 		}
 	}
 
-	if len(r.Header["Content-Type"]) <= 0 {
-		return
-	}
-
+	/*
+		if len(r.Header["Content-Type"]) <= 0 {
+			return
+		}
+	*/
 	return
 }
