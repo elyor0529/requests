@@ -94,6 +94,19 @@ func jsonHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+func jsonWithTypeParamHandler(w http.ResponseWriter, r *http.Request) {
+	data := []byte(`{"foo": ["bar", "baz"]}`)
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(data)
+}
+
+func multTypeHandler(w http.ResponseWriter, r *http.Request) {
+	data := []byte(`{"foo": ["bar", "baz"]}`)
+	w.Header().Set("Content-Type", "text/html")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(data)
+}
+
 // argsHandler writes the body's key if the body exists and
 // "auth" if Authorization key is founded in the requests' header.
 func argsHandler(w http.ResponseWriter, r *http.Request) {
@@ -157,17 +170,26 @@ func TestGetResponseAsBytes(t *testing.T) {
 	}
 }
 
+var jsonTestTable = []struct {
+	fn       func(http.ResponseWriter, *http.Request)
+	expected []byte
+}{
+	{jsonHandler, []byte(`{"foo": ["bar", "baz"]}`)},
+	{jsonWithTypeParamHandler, []byte(`{"foo": ["bar", "baz"]}`)},
+	{multTypeHandler, []byte(`{"foo": ["bar", "baz"]}`)},
+}
+
 func TestGetResponseAsJSON(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(jsonHandler))
-	defer ts.Close()
-	resp, err := Get(ts.URL)
-	if err != nil {
-		t.Error(err)
-	}
-	result := resp.JSON()
-	expected := []byte(`{"foo": ["bar", "baz"]}`)
-	if !reflect.DeepEqual(result, expected) {
-		t.Error(err)
+	for _, tt := range jsonTestTable {
+		ts := httptest.NewServer(http.HandlerFunc(tt.fn))
+		defer ts.Close()
+		resp, err := Get(ts.URL)
+		if err != nil {
+			t.Error(err)
+		}
+		if !reflect.DeepEqual(resp.JSON(), tt.expected) {
+			t.Error(err)
+		}
 	}
 }
 
