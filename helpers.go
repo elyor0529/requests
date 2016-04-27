@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/jochasinga/req/requests/gtime"
+	"github.com/jochasinga/gtime"
 )
 
 func marshalData(data, auth interface{}) (map[string][]byte, error) {

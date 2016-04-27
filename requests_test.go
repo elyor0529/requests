@@ -16,7 +16,8 @@ import (
 	"time"
 
 	"github.com/jochasinga/relay"
-	"github.com/jochasinga/req/requests/gtime"
+	//"github.com/jochasinga/req/requests/gtime"
+	"github.com/jochasinga/gtime"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
