@@ -29,37 +29,38 @@ type Response struct {
 
 // Len returns the response's body's unread portion's length,
 // which is the full length provided it has not been read.
-func (r *Response) Len() (len int) {
+func (r *Response) Len() int {
 	defer r.Body.Close()
 	buf := new(bytes.Buffer)
 	_, _ = buf.ReadFrom(r.Body)
-	len = buf.Len()
-	return
+	bodyLen := buf.Len()
+	return bodyLen
 }
 
 // String returns the response's body as string. Any errors
 // reading from the body is ignored for convenience.
-func (r *Response) String() (body string) {
+func (r *Response) String() string {
 	defer r.Body.Close()
 	buf := new(bytes.Buffer)
 	_, _ = buf.ReadFrom(r.Body)
-	body = buf.String()
-	return
+	bodyStr := buf.String()
+	return bodyStr
 }
 
 // Bytes returns the response's Body as []byte. Any errors
 // reading from the body is ignored for convenience.
-func (r *Response) Bytes() (content []byte) {
+func (r *Response) Bytes() []byte {
 	defer r.Body.Close()
 	buf := new(bytes.Buffer)
 	_, _ = buf.ReadFrom(r.Body)
-	content = buf.Bytes()
-	return
+	bodyBytes := buf.Bytes()
+	return bodyBytes
 }
 
-// JSON, like Bytes() but returns an empty []bytes "Content-Type" is set to
-// "application/json" in the response's header.
-func (r *Response) JSON() (jsn []byte) {
+// JSON returns the response's body as []byte if Content-Type is
+// in the header contains "application/json".
+func (r *Response) JSON() []byte {
+	jsn := []byte{}
 	for _, ct := range r.Header["Content-Type"] {
 		t, _, err := mime.ParseMediaType(ct)
 		if err != nil {
@@ -67,9 +68,8 @@ func (r *Response) JSON() (jsn []byte) {
 		}
 		if strings.Contains(t, "application/json") {
 			jsn = r.Bytes()
-			return
 		}
 
 	}
-	return
+	return jsn
 }

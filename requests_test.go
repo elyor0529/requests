@@ -413,7 +413,7 @@ func TestGetAsyncResponseTypeAndContent(t *testing.T) {
 				}
 			}
 			if len(d) > 0 {
-				for k, _ := range d {
+				for k := range d {
 					msg += ", " + k
 				}
 			}
@@ -561,7 +561,7 @@ func TestPostResponseTypeAndContent(t *testing.T) {
 			}
 
 			if len(d) > 0 {
-				for k, _ := range d {
+				for k := range d {
 					msg += ", " + k
 				}
 			}
