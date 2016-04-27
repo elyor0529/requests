@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/jochasinga/relay"
+	"github.com/jochasinga/req/requests/gtime"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -357,7 +358,7 @@ func TestGetResponseOnTimeout(t *testing.T) {
 			t.Error(errors.New("Client did not time out."))
 		}
 		elapsed := time.Since(start).Seconds()
-		deviation := floatTimeDev.Seconds()
+		deviation := gtime.FloatTime.Seconds()
 		if !(elapsed >= tt.expected-deviation || elapsed <= tt.expected+deviation) {
 			logExpectedResult(elapsed, tt.expected)
 			t.Error("Client returned before it should.")
