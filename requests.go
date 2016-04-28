@@ -8,8 +8,40 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"time"
 )
+
+// GetFunc is a proof-of-concept for functional API
+func GetFunc(urlStr string, options ...func(*Request)) (*Response, error) {
+	req, err := http.NewRequest("GET", urlStr, nil)
+	if err != nil {
+		return nil, err
+	}
+	request := &Request{
+		Request: req,
+		Client:  &http.Client{},
+		Params:  url.Values{},
+	}
+	for _, option := range options {
+		option(request)
+	}
+	sURL, _ := url.Parse(urlStr)
+	sURL.RawQuery = request.Params.Encode()
+	req.URL = sURL
+	// Parse query values into r.Form
+	err = req.ParseForm()
+	if err != nil {
+		return nil, err
+	}
+	resp, err := request.Client.Do(request.Request)
+	if err != nil {
+		return nil, err
+	}
+	// Wrap *http.Response with *Response
+	response := &Response{Response: resp}
+	return response, nil
+}
 
 // POCGet is a proof-of-concept version of Get
 func POCGet(urlStr string, args ...interface{}) (*Response, error) {
