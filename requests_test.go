@@ -15,9 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jochasinga/relay"
-	//"github.com/jochasinga/req/requests/gtime"
 	"github.com/jochasinga/gtime"
+	"github.com/jochasinga/relay"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -124,6 +123,95 @@ func argsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(r.Header["Authorization"]) > 0 {
 		io.WriteString(w, "authy")
+	}
+}
+
+var (
+	fn1 = func(r *Request) {
+		r.Header.Set("content-type", "application/json")
+	}
+	fn2 = func(r *Request) {
+		r.Timeout = time.Duration(10) * time.Second
+	}
+	fn3 = func(r *Request) {
+		r.SetBasicAuth("user", "pass")
+	}
+	fn4 = func(r *Request) {
+		r.Params.Add("foo", "bar")
+	}
+	fn5 = func(r *Request) {
+		r.Params.Add("name", "Ava")
+	}
+)
+
+var getFuncArgs = [...][]func(*Request){
+	{fn1},
+	{fn1, fn2},
+	{fn1, fn2, fn3},
+	{fn1, fn2, fn3, fn4},
+	{fn1, fn2, fn3, fn4, fn5},
+}
+
+var (
+	contentTypeHandler = func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, r.Header.Get("Content-Type"))
+	}
+	basicAuthHandler = func(w http.ResponseWriter, r *http.Request) {
+		user, password, ok := r.BasicAuth()
+		if !ok {
+			log.Panicln("Error getting Basic Auth.")
+		}
+		io.WriteString(w, user+" : "+password)
+	}
+	fooHandler = func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, r.FormValue("foo"))
+	}
+	nameHandler = func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, r.FormValue("name"))
+	}
+)
+
+var getFuncTestTable = []struct {
+	n        func(*Request)
+	handler  func(http.ResponseWriter, *http.Request)
+	expected string
+}{
+	{fn1, contentTypeHandler, "application/json"},
+	{fn3, basicAuthHandler, "user : pass"},
+	{fn4, fooHandler, "bar"},
+	{fn5, nameHandler, "Ava"},
+}
+
+func TestGetResponseOptions(t *testing.T) {
+	for _, tt := range getFuncTestTable {
+		ts := httptest.NewServer(http.HandlerFunc(tt.handler))
+		defer ts.Close()
+		resp, err := GetFunc(ts.URL, tt.n)
+		if err != nil {
+			t.Error(err)
+		}
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Error(err)
+		}
+		if string(body) != tt.expected {
+			log.Println(string(body))
+			t.Error(err)
+		}
+	}
+}
+
+func TestGetFuncResponseType(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
+	defer ts.Close()
+	for _, args := range getFuncArgs {
+		resp, err := GetFunc(ts.URL, args...)
+		if err != nil {
+			t.Error(err)
+		}
+		if reflect.TypeOf(resp) != reflect.TypeOf(&Response{}) {
+			t.Error(err)
+		}
 	}
 }
 
