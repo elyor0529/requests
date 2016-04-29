@@ -3,6 +3,7 @@
 package requests
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,69 +21,9 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-var (
-	bodyMap   = map[string][]string{"foo": []string{"bar", "baz"}}
-	authMap   = map[string]string{"user": "password"}
-	headerMap = map[string][]string{
-		"Accept-Encoding": {"gzip, deflate"},
-		"Accept-Language": {"en-us"},
-		"Content-Type":    {"application/json"},
-		"Foo":             {"Bar", "two"},
-	}
-	bodyHybridMap = map[string][]interface{}{
-		"duplica": {bodyMap, bodyStruct},
-	}
-	respJSON   = []byte(`{"foo": [{"bar", "baz"}]`)
-	bodyStruct = struct {
-		Foo []string `json:"foo"`
-	}{[]string{"bar", "baz"}}
-	authStruct = struct {
-		User string `json:"user"`
-	}{"password"}
-	headerStruct = struct {
-		ContentType    []string
-		AcceptEncoding []string
-		AcceptLanguage []string
-		Foo            []string
-	}{
-		[]string{"application/json"},
-		[]string{"gzip, deflate"},
-		[]string{"en-us"},
-		[]string{"Bar", "two"},
-	}
-)
-
 func logExpectedResult(result, expected interface{}) {
 	log.Printf("[RESULT]: %v\n", result)
 	log.Printf("[EXPECT]: %v\n", expected)
-}
-
-// Test various patterns of arguments
-// TODO: Add more patterns
-var getTestArgs = [...][]interface{}{
-	[]interface{}{nil, nil},
-	[]interface{}{nil, nil, nil},
-	[]interface{}{nil, authMap},
-	[]interface{}{nil, authStruct},
-	[]interface{}{nil, authMap, headerMap},
-	[]interface{}{nil, authStruct, headerMap},
-	[]interface{}{bodyMap, nil},
-	[]interface{}{bodyMap, nil, nil},
-	[]interface{}{bodyMap, nil, headerMap},
-	[]interface{}{bodyMap, authMap},
-	[]interface{}{bodyMap, authStruct},
-	[]interface{}{bodyStruct, authMap},
-	[]interface{}{bodyHybridMap, authMap},
-	[]interface{}{bodyHybridMap, authStruct},
-	[]interface{}{bodyMap, authMap, headerMap},
-	[]interface{}{bodyMap, authStruct, headerMap},
-	[]interface{}{bodyMap, authStruct, headerStruct},
-	[]interface{}{bodyStruct, authMap, headerMap},
-	[]interface{}{bodyStruct, authStruct, headerMap},
-	[]interface{}{bodyStruct, authStruct, headerStruct},
-	[]interface{}{bodyHybridMap, authMap, headerMap},
-	[]interface{}{bodyHybridMap, authStruct, headerMap},
-	[]interface{}{bodyHybridMap, authStruct, headerStruct},
 }
 
 func helloHandler(w http.ResponseWriter, r *http.Request) {
@@ -101,6 +42,12 @@ func jsonWithTypeParamHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+func htmlHandler(w http.ResponseWriter, r *http.Request) {
+	html := "<html><body><h1>Blanca!</h1></body></html>"
+	w.Header().Set("Content-Type", "text/html")
+	io.WriteString(w, html)
+}
+
 func multTypeHandler(w http.ResponseWriter, r *http.Request) {
 	data := []byte(`{"foo": ["bar", "baz"]}`)
 	w.Header().Set("Content-Type", "text/html")
@@ -108,30 +55,13 @@ func multTypeHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-// argsHandler writes the body's key if the body exists and
-// "auth" if Authorization key is founded in the requests' header.
-func argsHandler(w http.ResponseWriter, r *http.Request) {
-	var data map[string]interface{}
-	err := json.NewDecoder(r.Body).Decode(&data)
-	if err == io.EOF {
-		io.WriteString(w, "nada")
-	}
-	if len(data) > 0 {
-		for key := range data {
-			io.WriteString(w, key)
-		}
-	}
-	if len(r.Header["Authorization"]) > 0 {
-		io.WriteString(w, "authy")
-	}
-}
-
+/*************************** New GET ****************************/
 var (
 	fn1 = func(r *Request) {
 		r.Header.Set("content-type", "application/json")
 	}
 	fn2 = func(r *Request) {
-		r.Timeout = time.Duration(10) * time.Second
+		r.Timeout = time.Duration(3) * time.Second
 	}
 	fn3 = func(r *Request) {
 		r.SetBasicAuth("user", "pass")
@@ -142,19 +72,21 @@ var (
 	fn5 = func(r *Request) {
 		r.Params.Add("name", "Ava")
 	}
-)
-
-var getFuncArgs = [...][]func(*Request){
-	{fn1},
-	{fn1, fn2},
-	{fn1, fn2, fn3},
-	{fn1, fn2, fn3, fn4},
-	{fn1, fn2, fn3, fn4, fn5},
-}
-
-var (
+	getFuncArgs = [...][]func(*Request){
+		{fn1},
+		{fn1, fn2},
+		{fn1, fn2, fn3},
+		{fn1, fn2, fn3, fn4},
+		{fn1, fn2, fn3, fn4, fn5},
+	}
 	contentTypeHandler = func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, r.Header.Get("Content-Type"))
+	}
+	fooHandler = func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, r.FormValue("foo"))
+	}
+	nameHandler = func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, r.FormValue("name"))
 	}
 	basicAuthHandler = func(w http.ResponseWriter, r *http.Request) {
 		user, password, ok := r.BasicAuth()
@@ -163,49 +95,52 @@ var (
 		}
 		io.WriteString(w, user+" : "+password)
 	}
-	fooHandler = func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, r.FormValue("foo"))
+	getFuncTestTable = []struct {
+		fn       func(*Request)
+		handler  func(http.ResponseWriter, *http.Request)
+		expected string
+	}{
+		{fn1, contentTypeHandler, "application/json"},
+		{fn3, basicAuthHandler, "user : pass"},
+		{fn4, fooHandler, "bar"},
+		{fn5, nameHandler, "Ava"},
 	}
-	nameHandler = func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, r.FormValue("name"))
+	getFuncSyncTestTable = []struct {
+		delay    int
+		expected int
+	}{
+		{1, 2},
+		{2, 4},
+		{3, 6},
+		{4, 8},
+	}
+	getFuncTimeoutTestTable = []struct {
+		delay    int
+		timeout  float64
+		expected float64
+	}{
+		{1, 0.5, 0.5},
+		{2, 0.5, 0.5},
+		{2, 1.0, 1.0},
+		{3, 1.0, 1.0},
+	}
+	jsonFuncTestTable = []struct {
+		fn       func(http.ResponseWriter, *http.Request)
+		expected []byte
+	}{
+		{jsonHandler, []byte(`{"foo": ["bar", "baz"]}`)},
+		{jsonWithTypeParamHandler, []byte(`{"foo": ["bar", "baz"]}`)},
+		{multTypeHandler, []byte(`{"foo": ["bar", "baz"]}`)},
+		{htmlHandler, []byte{}},
 	}
 )
 
-var getFuncTestTable = []struct {
-	n        func(*Request)
-	handler  func(http.ResponseWriter, *http.Request)
-	expected string
-}{
-	{fn1, contentTypeHandler, "application/json"},
-	{fn3, basicAuthHandler, "user : pass"},
-	{fn4, fooHandler, "bar"},
-	{fn5, nameHandler, "Ava"},
-}
-
-func TestGetResponseOptions(t *testing.T) {
-	for _, tt := range getFuncTestTable {
-		ts := httptest.NewServer(http.HandlerFunc(tt.handler))
-		defer ts.Close()
-		resp, err := GetFunc(ts.URL, tt.n)
-		if err != nil {
-			t.Error(err)
-		}
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			t.Error(err)
-		}
-		if string(body) != tt.expected {
-			log.Println(string(body))
-			t.Error(err)
-		}
-	}
-}
-
+// Test that the returned type is always *Response.
 func TestGetFuncResponseType(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
 	defer ts.Close()
-	for _, args := range getFuncArgs {
-		resp, err := GetFunc(ts.URL, args...)
+	for _, fns := range getFuncArgs {
+		resp, err := GetFunc(ts.URL, fns...)
 		if err != nil {
 			t.Error(err)
 		}
@@ -215,206 +150,31 @@ func TestGetFuncResponseType(t *testing.T) {
 	}
 }
 
-func TestGetResponseType(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
-	defer ts.Close()
-	for _, args := range getTestArgs {
-		resp, err := Get(ts.URL, args...)
-		if err != nil {
-			t.Error(err)
-		}
-		if reflect.TypeOf(resp) != reflect.TypeOf(&Response{}) {
-			t.Error(err)
-		}
-	}
-}
-
-func TestGetResponse(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
-	defer ts.Close()
-	resp, err := Get(ts.URL)
-	if err != nil {
-		t.Error(err)
-	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Error(err)
-	}
-	if string(body) != "Hello world!" {
-		log.Println(string(body))
-		t.Error(err)
-	}
-}
-
-func TestGetResponseAsBytes(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
-	defer ts.Close()
-	resp, err := Get(ts.URL)
-	if err != nil {
-		t.Error(err)
-	}
-	result := resp.Bytes()
-	expected := []byte("Hello world!")
-	if !reflect.DeepEqual(result, expected) {
-		t.Error(err)
-	}
-}
-
-var jsonTestTable = []struct {
-	fn       func(http.ResponseWriter, *http.Request)
-	expected []byte
-}{
-	{jsonHandler, []byte(`{"foo": ["bar", "baz"]}`)},
-	{jsonWithTypeParamHandler, []byte(`{"foo": ["bar", "baz"]}`)},
-	{multTypeHandler, []byte(`{"foo": ["bar", "baz"]}`)},
-}
-
-func TestGetResponseAsJSON(t *testing.T) {
-	for _, tt := range jsonTestTable {
-		ts := httptest.NewServer(http.HandlerFunc(tt.fn))
+// Test that the request has the appropriate options.
+func TestGetFuncResponseOptions(t *testing.T) {
+	for _, tt := range getFuncTestTable {
+		ts := httptest.NewServer(http.HandlerFunc(tt.handler))
 		defer ts.Close()
-		resp, err := Get(ts.URL)
+		resp, err := GetFunc(ts.URL, tt.fn)
 		if err != nil {
 			t.Error(err)
 		}
-		if !reflect.DeepEqual(resp.JSON(), tt.expected) {
+		if resp.String() != tt.expected {
 			t.Error(err)
 		}
 	}
-}
-
-func TestGetResponseAsString(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
-	defer ts.Close()
-	resp, err := Get(ts.URL)
-	if err != nil {
-		t.Error(err)
-	}
-	result := resp.String()
-	expected := "Hello world!"
-	if result != expected {
-		t.Error(err)
-	}
-}
-
-var getTestTable = []struct {
-	args     []interface{}
-	expected string
-}{
-	{[]interface{}{}, "nada"},
-	{[]interface{}{nil}, "nada"},
-	{[]interface{}{bodyMap}, "foo"},
-	{[]interface{}{bodyHybridMap}, "duplica"},
-	{[]interface{}{nil, authMap}, "nadaauthy"},
-	{[]interface{}{bodyMap, authMap}, "fooauthy"},
-	{[]interface{}{bodyHybridMap, authMap}, "duplicaauthy"},
-}
-
-func TestGetArgsConcatInResponse(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(argsHandler))
-	defer ts.Close()
-	for _, tt := range getTestTable {
-		resp, err := Get(ts.URL, tt.args...)
-		if err != nil {
-			t.Error(err)
-		}
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			t.Error(err)
-		}
-		if string(body) != tt.expected {
-			log.Printf("[ACTUAL]: %v\n", string(body))
-			log.Printf("[EXPECTED]: %v\n", tt.expected)
-			t.Error(err)
-		}
-	}
-}
-
-var (
-	badURLs = []string{
-		"://maggot.#&",
-		"crap://bs.com",
-		"htp://f#as3",
-	}
-	badArgs = []interface{}{
-		make(chan int),
-		func() {},
-		12i,
-	}
-)
-
-func TestGetWithBadURLs(t *testing.T) {
-	for _, url := range badURLs {
-		_, err := Get(url)
-		if err == nil {
-			t.Error(err)
-		}
-	}
-}
-
-func TestGetWithBadData(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
-	defer ts.Close()
-	for _, arg := range badArgs {
-		_, err := Get(ts.URL, arg)
-		if err == nil {
-			t.Error(err)
-		}
-	}
-}
-
-func TestGetWithBadAuth(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
-	defer ts.Close()
-	for _, arg := range badArgs {
-		_, err := Get(ts.URL, nil, arg)
-		if err == nil {
-			t.Error(err)
-		}
-	}
-}
-
-func TestGetWithBadHeader(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
-	defer ts.Close()
-	for _, arg := range badArgs {
-		_, err := Get(ts.URL, nil, nil, arg)
-		if err == nil {
-			t.Error(err)
-		}
-	}
-}
-
-func TestGetWithForthArgs(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
-	defer ts.Close()
-	extra := map[string]string{"foo": "bar"}
-	_, err := Get(ts.URL, nil, nil, nil, extra)
-	if err == nil {
-		t.Error(err)
-	}
-}
-
-var getSyncTestTable = []struct {
-	delay    int
-	expected int
-}{
-	{1, 2},
-	{2, 4},
-	{3, 6},
-	{4, 8},
 }
 
 // Get should wait for the response and return
-func TestGetResponseTimes(t *testing.T) {
+func TestGetFuncResponseTime(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
 	defer ts.Close()
-	for _, tt := range getSyncTestTable {
+	for _, tt := range getFuncSyncTestTable {
 		delay := time.Duration(tt.delay) * time.Second
 		expected := time.Duration(tt.expected) * time.Second
 		p := relay.NewProxy(delay, ts)
 		start := time.Now()
-		_, _ = Get(p.URL)
+		_, _ = GetFunc(p.URL)
 		elapsed := time.Since(start)
 		if elapsed <= expected {
 			logExpectedResult(elapsed, expected)
@@ -423,26 +183,17 @@ func TestGetResponseTimes(t *testing.T) {
 	}
 }
 
-var timeoutTestTable = []struct {
-	delay    int
-	timeout  float64
-	expected float64
-}{
-	{1, 0.5, 0.5},
-	{2, 0.5, 0.5},
-	{2, 1.0, 1.0},
-	{3, 1.0, 1.0},
-}
-
 // Get should wait fo the response until timed out.
-func TestGetResponseOnTimeout(t *testing.T) {
+func TestGetFuncResponseOnTimeout(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
 	defer ts.Close()
-	for _, tt := range timeoutTestTable {
+	for _, tt := range getFuncTimeoutTestTable {
 		delay := time.Duration(tt.delay) * time.Second
 		p := relay.NewProxy(delay, ts)
 		start := time.Now()
-		_, err := POCGet(p.URL, nil, nil, nil, tt.timeout)
+		_, err := GetFunc(p.URL, func(r *Request) {
+			r.Timeout = gtime.Ftos(tt.timeout)
+		})
 		if err == nil {
 			t.Error(errors.New("Client did not time out."))
 		}
@@ -451,6 +202,63 @@ func TestGetResponseOnTimeout(t *testing.T) {
 		if !(elapsed >= tt.expected-deviation || elapsed <= tt.expected+deviation) {
 			logExpectedResult(elapsed, tt.expected)
 			t.Error("Client returned before it should.")
+		}
+	}
+}
+
+func TestGetFuncResponseAsBytes(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
+	defer ts.Close()
+	resp, err := GetFunc(ts.URL)
+	if err != nil {
+		t.Error(err)
+	}
+	result := resp.Bytes()
+	expected := []byte("Hello world!")
+	if bytes.Compare(result, expected) != 0 {
+		t.Error("Unexpected result.")
+	}
+}
+
+func TestGetFuncResponseAsJSON(t *testing.T) {
+	for _, tt := range jsonFuncTestTable {
+		ts := httptest.NewServer(http.HandlerFunc(tt.fn))
+		defer ts.Close()
+		resp, err := GetFunc(ts.URL)
+		if err != nil {
+			t.Error(err)
+		}
+		if bytes.Compare(resp.JSON(), tt.expected) != 0 {
+			t.Error(err)
+		}
+	}
+}
+
+func TestGetFuncResponseAsString(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
+	defer ts.Close()
+	resp, err := GetFunc(ts.URL)
+	if err != nil {
+		t.Error(err)
+	}
+	if resp.String() != "Hello world!" {
+		t.Error(err)
+	}
+}
+
+/*************************** New GET ****************************/
+
+var badURLs = []string{
+	"://maggot.#&",
+	"crap://bs.com",
+	"htp://f#as3",
+}
+
+func TestGetWithBadURLs(t *testing.T) {
+	for _, url := range badURLs {
+		_, err := GetFunc(url)
+		if err == nil {
+			t.Error(err)
 		}
 	}
 }
@@ -470,7 +278,7 @@ func TestGetAsyncResponseTimes(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
 	defer ts.Close()
 	deviation := time.Duration(10) * time.Millisecond
-	for _, tt := range getSyncTestTable {
+	for _, tt := range getFuncSyncTestTable {
 		delay := time.Duration(tt.delay) * time.Second
 		expected := time.Duration(tt.expected)*time.Second + deviation
 		p := relay.NewProxy(delay, ts)

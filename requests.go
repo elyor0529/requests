@@ -5,14 +5,21 @@ package requests
 import (
 	"bytes"
 	"encoding/json"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"time"
 )
 
-// GetFunc is a proof-of-concept for functional API
+// GetFunc sends a HTTP GET request to the provided url with the
+// functional options to add query paramaters, headers, timeout, etc.
+//
+//     var addMimeType = func(r *Request) {
+//             r.Header.Add("content-type", "application/json")
+//     }
+//
+//     resp, err := requests.Get("http://httpbin.org/get", addMimeType)
+//
 func GetFunc(urlStr string, options ...func(*Request)) (*Response, error) {
 	req, err := http.NewRequest("GET", urlStr, nil)
 	if err != nil {
@@ -40,116 +47,6 @@ func GetFunc(urlStr string, options ...func(*Request)) (*Response, error) {
 	}
 	// Wrap *http.Response with *Response
 	response := &Response{Response: resp}
-	return response, nil
-}
-
-// POCGet is a proof-of-concept version of Get
-func POCGet(urlStr string, args ...interface{}) (*Response, error) {
-	results, err := marshalGetAll(args)
-	if err != nil {
-		return nil, err
-	}
-	// Body
-	var bodyStream io.ReadCloser
-	if results["body"] != nil {
-		body := results["body"].(*bytes.Buffer)
-		bodyStream = ioutil.NopCloser(body)
-	}
-	req, err := http.NewRequest("GET", urlStr, bodyStream)
-	if err != nil {
-		return nil, err
-	}
-	// Basic Auth
-	if results["auth"] != nil {
-		var authData map[string]interface{}
-		auth := results["auth"].(*bytes.Buffer)
-		err = json.Unmarshal(auth.Bytes(), &authData)
-		if err != nil {
-			return nil, err
-		}
-		for usr, pw := range authData {
-			password, ok := pw.(string)
-			if !ok {
-				return nil, err
-			}
-			req.SetBasicAuth(usr, password)
-		}
-	}
-	// Custom headers
-	if results["header"] != nil {
-		headers := results["header"].(http.Header)
-		req.Header = headers
-	}
-	// Timeout
-	client := &http.Client{}
-	if results["timeout"] != nil {
-		timeout := results["timeout"].(time.Duration)
-		client.Timeout = timeout
-	} else {
-		client = http.DefaultClient
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	// Wrap *http.Response with *Response
-	response := &Response{
-		Response: resp,
-	}
-	return response, nil
-}
-
-// Get sends a HTTP GET request to the provided URL with the
-// optional body, basic auth, and custom headers.
-func Get(urlStr string, args ...interface{}) (*Response, error) {
-	results, err := marshalGet(args)
-	if err != nil {
-		return nil, err
-	}
-	// Body
-	var bodyStream io.ReadCloser
-	if len(results["body"]) > 0 {
-		body := results["body"]
-		bodyStream = ioutil.NopCloser(bytes.NewBuffer(body))
-	}
-	req, err := http.NewRequest("GET", urlStr, bodyStream)
-	if err != nil {
-		return nil, err
-	}
-	// Basic Auth
-	if len(results["auth"]) > 0 {
-		var authData map[string]interface{}
-		auth := results["auth"]
-		err = json.Unmarshal(auth, &authData)
-		if err != nil {
-			return nil, err
-		}
-		for usr, pw := range authData {
-			password, ok := pw.(string)
-			if !ok {
-				return nil, err
-			}
-			req.SetBasicAuth(usr, password)
-		}
-	}
-	// Custom headers
-	if len(results["header"]) > 0 {
-		var headerData http.Header
-		headers := results["header"]
-		err = json.Unmarshal(headers, &headerData)
-		if err != nil {
-			return nil, err
-		}
-		req.Header = headerData
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	// Wrap *http.Response with *Response
-	response := &Response{
-		Response: resp,
-	}
 	return response, nil
 }
 
