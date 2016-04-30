@@ -50,6 +50,46 @@ func GetFunc(urlStr string, options ...func(*Request)) (*Response, error) {
 	return response, nil
 }
 
+/********************* EXPERIMETAL GetAsync **********************/
+func GetFuncAsync(urlStr string, options ...func(*Request)) (<-chan *Response, error) {
+	req, err := http.NewRequest("GET", urlStr, nil)
+	if err != nil {
+		return nil, err
+	}
+	request := &Request{
+		Request: req,
+		Client:  &http.Client{},
+		Params:  url.Values{},
+	}
+	for _, option := range options {
+		option(request)
+	}
+	sURL, _ := url.Parse(urlStr)
+	sURL.RawQuery = request.Params.Encode()
+	req.URL = sURL
+	// Parse query values into r.Form
+	err = req.ParseForm()
+	if err != nil {
+		return nil, err
+	}
+	rc := make(chan *Response)
+	go func() {
+		resp, err := request.Client.Do(request.Request)
+		// Wrap *http.Response with *Response
+		response := &Response{}
+		if err != nil {
+			response.Error = err
+			rc <- response
+		}
+		response.Response = resp
+		rc <- response
+		close(rc)
+	}()
+	return rc, nil
+}
+
+/********************* EXPERIMETAL GetAsync **********************/
+
 // GetAsync sends a HTTP GET request to the provided URL with
 // data and authorization maps or structs. It returns a chan
 // *http.Response immediately.

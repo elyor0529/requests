@@ -25,6 +25,7 @@ type HTTPResponse interface {
 // Response is a *http.Response and implements HTTPResponse.
 type Response struct {
 	*http.Response
+	Error error
 }
 
 // Len returns the response's body's unread portion's length,
