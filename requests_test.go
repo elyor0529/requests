@@ -133,6 +133,11 @@ var (
 		{multTypeHandler, []byte(`{"foo": ["bar", "baz"]}`)},
 		{htmlHandler, []byte{}},
 	}
+	badURLs = []string{
+		"://maggot.#&",
+		"crap://bs.com",
+		"htp://f#as3",
+	}
 )
 
 // Test that the returned type is always *Response.
@@ -145,7 +150,7 @@ func TestGetFuncResponseType(t *testing.T) {
 			t.Error(err)
 		}
 		if reflect.TypeOf(resp) != reflect.TypeOf(&Response{}) {
-			t.Error(err)
+			t.Error(fmt.Errorf("Unexpected type %T", reflect.TypeOf(resp)))
 		}
 	}
 }
@@ -246,14 +251,6 @@ func TestGetFuncResponseAsString(t *testing.T) {
 	}
 }
 
-/*************************** New GET ****************************/
-
-var badURLs = []string{
-	"://maggot.#&",
-	"crap://bs.com",
-	"htp://f#as3",
-}
-
 func TestGetWithBadURLs(t *testing.T) {
 	for _, url := range badURLs {
 		_, err := GetFunc(url)
@@ -262,6 +259,8 @@ func TestGetWithBadURLs(t *testing.T) {
 		}
 	}
 }
+
+/*************************** New GET ****************************/
 
 var getAsyncTestTable = []struct {
 	delay    int
@@ -569,3 +568,56 @@ func TestPostResponseTypeAndContent(t *testing.T) {
 		})
 	})
 }
+
+/************************* EXPERIMETAL GetAsync ***********************/
+func TestGetFuncAsyncResponseType(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
+	defer ts.Close()
+	rc, err := GetFuncAsync(ts.URL)
+	if err != nil {
+		t.Error(err)
+	}
+	if reflect.TypeOf(rc) != reflect.TypeOf((<-chan *Response)(nil)) {
+		t.Error(fmt.Errorf("Unexpected type %v", reflect.TypeOf(rc)))
+	}
+}
+
+// GetAsync should return immediately.
+func TestGetFuncAsyncResponseTimes(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
+	defer ts.Close()
+	deviation := time.Duration(10) * time.Millisecond
+	for _, tt := range getFuncSyncTestTable {
+		delay := time.Duration(tt.delay) * time.Second
+		expected := time.Duration(tt.expected)*time.Second + deviation
+		p := relay.NewProxy(delay, ts)
+		start := time.Now()
+		_, _ = GetFuncAsync(p.URL)
+		elapsed := time.Since(start)
+		if elapsed >= expected {
+			logExpectedResult(elapsed, expected)
+			t.Error("Client did not return immediately.")
+		}
+	}
+}
+
+// GetAsync should return immediately.
+func TestGetFuncAsyncResponse(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
+	defer ts.Close()
+	delay := time.Duration(1) * time.Second
+	p := relay.NewProxy(delay, ts)
+	rc, err := GetFuncAsync(p.URL)
+	if err != nil {
+		t.Error(err)
+	}
+	result := <-rc
+	if result.Error != nil {
+		t.Error(result.Error)
+	}
+	if result.String() != "Hello world!" {
+		t.Error(fmt.Errorf("Expected \"Hello world!\". Got %q", result.String()))
+	}
+}
+
+/************************* EXPERIMETAL GetAsync ***********************/
