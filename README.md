@@ -175,16 +175,23 @@ res, err := requests.Post("https://httpbin.org/post", "application/json", &buf, 
 
 ```
 
-`requests.PostJSON` marshals your data as JSON and set `bodyType` to
-`application/json` implicitly.
+`requests.PostJSON` marshals your map or struct data as JSON and set `bodyType`
+to `application/json` implicitly.
 
 ```go
 
-first := map[string][]string{"foo": []string{"bar", "baz"}}
-second := struct {Foo []string `json:"foo"`}{[]string{"bar", "baz"}}
-payload := map[string][]interface{}{"twins": {first, second}}
+first := map[string][]string{
+	"foo": []string{"bar", "baz"},
+}
+second := struct {
+	Foo []string `json:"foo"`
+}{[]string{"bar", "baz"}}
 
-res, err := requests.PostJSON("https://httpbin.org/post", data)
+payload := map[string][]interface{}{
+	"twins": {first, second}
+}
+
+res, err := requests.PostJSON("https://httpbin.org/post", payload)
 
 ```
 
@@ -201,8 +208,8 @@ These methods will return an equivalent of `nil` for each return type if a
 certain condition isn't met. For instance:
 
 ```go
-resp, _ := requests.Get("http://somecoolsite.io")
-fmt.Println(resp.JSON())
+res, _ := requests.Get("http://somecoolsite.io")
+fmt.Println(res.JSON())
 ```
 
 If the response from the server does not specify `Content-Type` as "application/json",
