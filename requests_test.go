@@ -11,12 +11,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/jochasinga/gtime"
 	"github.com/jochasinga/relay"
-	//. "github.com/smartystreets/goconvey/convey"
 )
 
 func unexpectErr(result, expected interface{}) error {
@@ -104,7 +104,7 @@ var (
 	}
 	postFuncTestTable = []struct {
 		bodyType string
-		body     *bytes.Buffer
+		body     io.Reader
 		opts     []func(*Request)
 	}{
 		{
@@ -112,7 +112,26 @@ var (
 			bytes.NewBufferString(`{"foo":"bar"}`),
 			[]func(*Request){fn1, fn2, fn3, fn4, fn5},
 		},
+		{
+			"text/xml",
+			strings.NewReader(`<foo>bar</foo>`),
+			[]func(*Request){fn1, fn2, fn3, fn4, fn5},
+		},
 	}
+
+	// Data for testing PostJSON
+	bodyMap    = map[string][]string{"foo": []string{"bar", "baz"}}
+	bodyStruct = struct {
+		Foo []string `json:"foo"`
+	}{[]string{"bar", "baz"}}
+	bodyHybridMap = map[string][]interface{}{
+		"duplica": {bodyMap, bodyStruct},
+	}
+	postJSONArgs = [...]interface{}{
+		bodyMap, bodyStruct, bodyHybridMap,
+	}
+
+	// For testing timeouts
 	getFuncSyncTestTable = []struct {
 		delay    int
 		expected int
@@ -154,6 +173,22 @@ func TestPostResponseType(t *testing.T) {
 	defer ts.Close()
 	for _, tt := range postFuncTestTable {
 		resp, err := Post(ts.URL, tt.bodyType, tt.body, tt.opts...)
+		if err != nil {
+			t.Error(err)
+		}
+		resultType := reflect.TypeOf(resp)
+		expectedType := reflect.TypeOf(&Response{})
+		if resultType != expectedType {
+			t.Error(unexpectErr(resultType, expectedType))
+		}
+	}
+}
+
+func TestPostJSONResponseType(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
+	defer ts.Close()
+	for _, arg := range postJSONArgs {
+		resp, err := PostJSON(ts.URL, arg)
 		if err != nil {
 			t.Error(err)
 		}
@@ -343,7 +378,7 @@ func TestGetAsyncResponseType(t *testing.T) {
 }
 
 // GetAsync should return immediately.
-func TestGetFuncAsyncResponseTimes(t *testing.T) {
+func TestGetAsyncResponseTimes(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
 	defer ts.Close()
 	deviation := time.Duration(10) * time.Millisecond
@@ -361,7 +396,7 @@ func TestGetFuncAsyncResponseTimes(t *testing.T) {
 }
 
 // GetAsync should return immediately.
-func TestGetFuncAsyncResponse(t *testing.T) {
+func TestGetAsyncResponse(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
 	defer ts.Close()
 	delay := time.Duration(1) * time.Second
