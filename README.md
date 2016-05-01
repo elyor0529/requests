@@ -123,7 +123,7 @@ if err != nil {
 
 // Block and wait for the response
 res := <-rc
-if resp.Error != nil {
+if res.Error != nil {
 	panic(resp.Error)
 }
 fmt.Println(res.StatusCode)  // 200
