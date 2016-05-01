@@ -1,12 +1,12 @@
 requests
 ========
-[![GoDoc](https://godoc.org/github.com/jochasinga/requests?status.svg)](https://godoc.org/github.com/jochasinga/requests)   [![Build Status](https://drone.io/github.com/jochasinga/requests/status.png?style=flat)](https://drone.io/github.com/jochasinga/requests/latest)   [![Coverage Status](https://coveralls.io/repos/github/jochasinga/requests/badge.svg?branch=master)](https://coveralls.io/github/jochasinga/requests?branch=master)   [![Flattr this git repo](http://api.flattr.com/button/flattr-badge-large.png)](https://flattr.com/submit/auto?user_id=jochasinga&url=https://github.com/jochasinga/requests&title=Relay&language=English&tags=github&category=software)
+[![GoDoc](https://godoc.org/github.com/jochasinga/requests?status.svg)](https://godoc.org/github.com/jochasinga/requests)   [![Build Status](https://travis-ci.org/jochasinga/requests.svg?branch=master)](https://travis-ci.org/jochasinga/requests)   [![Coverage Status](https://coveralls.io/repos/github/jochasinga/requests/badge.svg?branch=master)](https://coveralls.io/github/jochasinga/requests?branch=master)   [![Flattr this git repo](http://api.flattr.com/button/flattr-badge-large.png)](https://flattr.com/submit/auto?user_id=jochasinga&url=https://github.com/jochasinga/requests&title=Relay&language=English&tags=github&category=software)
 
 Go HTTP Requests for Rodents (◕ᴥ◕)
 
 Introduction
 ------------
-**requests** is a minimal, atomic and expressive way of making HTTP requests.
+**requests** is a minimal, atomic, and functional way of making HTTP requests.
 It is inspired partly by the HTTP request libraries in other dynamic languages
 like Python and Javascript. It is safe for all [rodents](http://www.styletails.com/wp-content/uploads/2014/06/guinea-pig-booboo-lieveheersbeestje-2.jpg), not just Gophers.
 
@@ -18,29 +18,30 @@ This pattern is adopted after feedbacks from the Go community.
 ```go
 
 jsontype := func(r *requests.Request) {
-	r.Header.Add("content-type", "application/json")
+        r.Header.Add("content-type", "application/json")
 }
 res, err := requests.Get("http://example.com", jsontype)
 
 ```
 
 #### Embedded Standard Types
-requests use custom [Request](https://godoc.org/github.com/jochasinga/requests#Request)
+requests uses custom [Request](https://godoc.org/github.com/jochasinga/requests#Request)
 and [Response](https://godoc.org/github.com/jochasinga/requests#Response) types
 to embed standard `http.Request`, `http.Response`, and `http.Client`
-in order to insert helper methods and fields, make it easy to
-configure options atomically, and [handle asynchronous errors](#handling-async-errors)
+in order to insert helper methods, make it easy to configure options atomically,
+and [handle asynchronous errors using a special field](#handling-async-errors).
 
 ```go
 
 timeout := func(r *requests.Request) {
-	r.Timeout = time.Duration(5) * time.Second
+        r.Timeout = time.Duration(5) * time.Second
 }
 res, err := requests.Get("http://example.com", timeout)
 if err != nil {
-	panic(err)
+        panic(err)
 }
-// helper methods
+
+// Helper method
 htmlStr := res.String()
 
 ```
@@ -48,13 +49,15 @@ htmlStr := res.String()
 See [Types and Methods](#types-and-methods) for more information.
 
 #### Asynchronous API
-`requests.GetAsync` transparently returns a channel on which a response
-can be waited on.
+`requests.GetAsync` returns a channel on which a `*requests.Response` can be
+waited on.
 
 ```go
 
 rc, _ := requests.GetAsync("http://httpbin.org/get")
 res := <-rc
+
+// Helper method
 content := res.Bytes()
 
 ```
@@ -90,22 +93,22 @@ or content type, use functional options.
 
 ```go
 
-// Add a query parameter
+// Add a query parameter.
 addFoo := func(r *requests.Request) {
-	r.Params.Add("foo", "bar")
+        r.Params.Add("foo", "bar")
 }
 
-// Set basic username and password
+// Set basic username and password.
 setAuth := func(r *requests.Request) {
-	r.SetBasicAuth("user", "pass")
+        r.SetBasicAuth("user", "pass")
 }
 
-// Set the Content-Type
+// Set the Content-Type.
 setMime := func(r *requests.Request) {
-	r.Header.Add("content-type", "application/json")
+        r.Header.Add("content-type", "application/json")
 }
 
-// Pass as parameters to the function
+// Pass as parameters to the function.
 res, err := requests.Get("http://httpbin.org/get", addFoo, setAuth, setMime)
 
 ```
@@ -115,22 +118,21 @@ Or everything goes into one functional option.
 ```go
 
 opts := func(r *requests.Request) {
-	r.Params.Add("foo", "bar")
-	r.SetBasicAuth("user", "pass")
-	r.Header.Add("content-type", "application/json")
+        r.Params.Add("foo", "bar")
+        r.SetBasicAuth("user", "pass")
+        r.Header.Add("content-type", "application/json")
 }
 res, err := requests.Get("http://httpbin.org/get", opts)
 
 ```
 
 #### Asynchronous GET
-`requests.GetAsync` returns a receive-only channel `<-chan *Response`, on which
-you response can be waited.
+`requests.GetAsync` returns `<-chan *Response`, on which you response can be waited.
 
 ```go
 
 timeout := func(r *requests.Request) {
-	r.Timeout = time.Duration(5) * time.Second
+        r.Timeout = time.Duration(5) * time.Second
 }
 
 rc, err := requests.GetAsync("http://golang.org", timeout)
@@ -140,9 +142,10 @@ if err != nil {
 
 // Do other things...
 
-// Block and wait.
+// Block and wait
 res := <-rc
-// Handle a "reject" this way.
+
+// Handle a "reject" with Error field.
 if res.Error != nil {
 	panic(res.Error)
 }
@@ -171,17 +174,16 @@ for i := 0; i < 3; i++ {
 
 ```
 
-> TODO: `requests.Pool` coming soon.
-
 #### POST requests
 `requests.Post` is used to send POST requests
 
 ```go
 
 res, err := requests.Post("https://httpbin.org/post", "image/jpeg", &buf)
+
 ```
 
-It also accept variadic number of functional options:
+It also accepts variadic number of functional options:
 
 ```go
 
@@ -198,14 +200,14 @@ to `application/json` implicitly.
 ```go
 
 first := map[string][]string{
-	"foo": []string{"bar", "baz"},
+        "foo": []string{"bar", "baz"},
 }
 second := struct {
-	Foo []string `json:"foo"`
+        Foo []string `json:"foo"`
 }{[]string{"bar", "baz"}}
 
 payload := map[string][]interface{}{
-	"twins": {first, second}
+        "twins": {first, second}
 }
 
 res, err := requests.PostJSON("https://httpbin.org/post", payload)
@@ -214,8 +216,29 @@ res, err := requests.PostJSON("https://httpbin.org/post", payload)
 
 Types and Methods
 -----------------
+#### `requests.Request`
+It has embedded types `*http.Request` and `*http.Client`, making it an atomic
+type to pass into a functional option.
+It also contains field `Params`, which has the type `url.Values`. Use this field
+to add query parameters to your URL. Currently, parameters in `Params` will replace
+all the existing query string in the URL.
+
+```go
+
+addParams := func(r *requests.Request) {
+        r.Params = url.Values{
+	        "name": {"Ava", "Sanchez", "Poco"},
+        }
+}
+
+// "q=cats" will be replaced by the new query string
+res, err := requests.Get("https://httpbin.org/get?q=cats", addParams)
+
+```
+
 #### `requests.Response`
-Provides extra byte-like methods such as:
+It has embedded type `*http.Response` and provides extra byte-like helper methods
+such as:
 + `Len() int`
 + `String() string`
 + `Bytes() []byte`
@@ -242,16 +265,16 @@ response's header.
 
 mime, _, err := res.ContentType()
 if mime != "application/json" {
-	fmt.Printf("res.JSON() returns empty bytes")
+        fmt.Printf("res.JSON() returns empty %v", res.JSON())
 }
 
 ```
 
 #### `Handling Async Errors`
-`requests.Response` has an `Error` field which will contain any error
+`requests.Response` also has an `Error` field which will contain any error
 caused in the goroutine within `requests.GetAsync` and carries it downstream
-to the main goroutine for proper handling (Think `reject` in Promise but
-less confusing).
+to the main goroutine for proper handling (Think `reject` in Promise but more
+straightforward in Go-style).
 
 ```go
 rc, _ := requests.GetAsync("http://www.docker.io")
@@ -266,13 +289,14 @@ fmt.Println(res.StatusCode)
 is received from a synchronous `Get`, since the error is already returned at the
 function's level.
 
-At this point, admittedly, `GetAsync` does not offer much more than a GET request
-in a goroutine. Go is already a language built with asynchronous I/O in mind, and
-in my opinion it does not need any extra async implementation. hat's why it
-decidedly returns a channel, Go's very native way of communication.    
+At this point `GetAsync` does not offer much more than a GET request
+in a goroutine. Go is already a language built for async first-hand, and
+in my opinion it does not need any extra async implementation. `GetAsync`
+decidedly returns a channel, Go's native way of communication, instead
+of a layer of abstraction like a Promise.
 
-**requests** will try to be just a convenient HTTP tool. You're free to pick and
-choose the methods that suite you best.
+**requests** will try to be thin. You're free to pick and choose the method
+that suite you best.
 
 HTTP Test Servers
 -----------------
