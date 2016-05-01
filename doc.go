@@ -3,13 +3,12 @@
 // license that can be found in the LICENSE file.
 
 /*
-Package requests is HTTP requests made simple for rodents. It is inspired partly
-by the awesomeness of HTTP request libraries in dynamic languages like Python
-and Javascript. It is crafted for all rodents (and even cats), not just Gophers.
+Package requests is a minimal, atomic and expressive way of making HTTP requests.
+It is inspired partly by the HTTP request libraries in other dynamic languages
+like Python and Javascript. It is safe for all rodents, not just Gophers.
 
-Requests is built around Go's standard http package, and in fact it is encourage
-to dive in and use it to learn Go, as requests is built as a tool of convenience
-than a wholely transparent one.
+Requests is built as a convenient, expressive API around Go's standard http package.
+With special Request and Response types to help facilitate and streamline RESTful tasks.
 
 To send a common GET request just like you'd do with `http.Get`.
 
@@ -18,20 +17,31 @@ To send a common GET request just like you'd do with `http.Get`.
         )
 
         func main() {
-        	res, err := requests.Get("http://httpbin.org/get")
-        	fmt.Println(res.StatusCode)  // 200
+        	resp, err := requests.Get("http://httpbin.org/get")
+        	fmt.Println(resp.StatusCode)  // 200
         }
 
-You can send an additional data, auth and custom header with your request.
+To send additional data, such as a query parameter, basic authorization header,
+or content type, just pass in functional options:
 
-
-        data := map[string][]string{"foo": ["bar", "baz"]}
-        auth := map[string]string{"user": "password"}
-        header := map[string][]string{
-                "Content-Type": []string{"application/json"},
+        addFoo := func(r *Request) {
+                r.Params.Add("foo", "bar")
         }
+        addAuth := func(r *Request) {
+                r.SetBasicAuth("user", "pass")
+        }
+        addMime := func(r *Request) {
+                r.Header.Add("content-type", "application/json")
+        }
+        resp, err := requests.Get("http://httpbin.org/get", addFoo, addAuth, addMime)
 
-        res, err := requests.Get("http://httpbin.org/get", data, auth, header)
+        // Or everything goes into one functional option
+        opts := func(r *Request) {
+                r.Params.Add("foo", "bar")
+                r.SetBasicAuth("user", "pass")
+                r.Header.Add("content-type", "application/json")
+        }
+        resp, err := requests.Get("http://httpbin.org/get", opts)
 
 The data can be a map or struct (anything JSON-marshalable).
 

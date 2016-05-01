@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-// HTTPResponse is an interface type implemented by *Response and *http.Response.
+// HTTPResponse is meant for future use for the time being.
 type HTTPResponse interface {
 	Cookies() []*http.Cookie
 	Location() (*url.URL, error)
@@ -26,6 +26,17 @@ type HTTPResponse interface {
 type Response struct {
 	*http.Response
 	Error error
+}
+
+// ContentType is an alias for Response.Header.Get("content-type"), but
+// filtered through mime.ParseMediaType to rid of extra arguments such as encoding.
+func (r *Response) ContentType() (string, map[string]string, error) {
+	ct := r.Header.Get("content-type")
+	filtered, params, err := mime.ParseMediaType(ct)
+	if err != nil {
+		return "", nil, err
+	}
+	return filtered, params, nil
 }
 
 // Len returns the response's body's unread portion's length,

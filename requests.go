@@ -5,22 +5,25 @@ package requests
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
-	"time"
 )
 
-// GetFunc sends a HTTP GET request to the provided url with the
+// Get sends a HTTP GET request to the provided url with the
 // functional options to add query paramaters, headers, timeout, etc.
 //
-//     var addMimeType = func(r *Request) {
+//     addMimeType := func(r *Request) {
 //             r.Header.Add("content-type", "application/json")
 //     }
 //
 //     resp, err := requests.Get("http://httpbin.org/get", addMimeType)
+//     if err != nil {
+//             panic(err)
+//     }
+//     fmt.Println(resp.StatusCode)
 //
-func GetFunc(urlStr string, options ...func(*Request)) (*Response, error) {
+func Get(urlStr string, options ...func(*Request)) (*Response, error) {
 	req, err := http.NewRequest("GET", urlStr, nil)
 	if err != nil {
 		return nil, err
@@ -30,12 +33,15 @@ func GetFunc(urlStr string, options ...func(*Request)) (*Response, error) {
 		Client:  &http.Client{},
 		Params:  url.Values{},
 	}
+
+	// Apply options in the parameters to request.
 	for _, option := range options {
 		option(request)
 	}
 	sURL, _ := url.Parse(urlStr)
 	sURL.RawQuery = request.Params.Encode()
 	req.URL = sURL
+
 	// Parse query values into r.Form
 	err = req.ParseForm()
 	if err != nil {
@@ -45,13 +51,29 @@ func GetFunc(urlStr string, options ...func(*Request)) (*Response, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	// Wrap *http.Response with *Response
 	response := &Response{Response: resp}
 	return response, nil
 }
 
-/********************* EXPERIMETAL GetAsync **********************/
-func GetFuncAsync(urlStr string, options ...func(*Request)) (<-chan *Response, error) {
+// GetAsync sends a HTTP GET request to the provided URL and
+// returns a <-chan *http.Response immediately.
+//
+//     timeout := func(r *request.Request) {
+//             r.Timeout = time.Duration(10) * time.Second
+//     }
+//     rc, err := requests.GetAsync("http://httpbin.org/get", timeout)
+//     if err != nil {
+//             panic(err)
+//     }
+//     resp := <-rc
+//     if resp.Error != nil {
+//             panic(resp.Error)
+//     }
+//     fmt.Println(resp.String())
+//
+func GetAsync(urlStr string, options ...func(*Request)) (<-chan *Response, error) {
 	req, err := http.NewRequest("GET", urlStr, nil)
 	if err != nil {
 		return nil, err
@@ -88,57 +110,105 @@ func GetFuncAsync(urlStr string, options ...func(*Request)) (<-chan *Response, e
 	return rc, nil
 }
 
-/********************* EXPERIMETAL GetAsync **********************/
-
-// GetAsync sends a HTTP GET request to the provided URL with
-// data and authorization maps or structs. It returns a chan
-// *http.Response immediately.
-func GetAsync(url string, data, auth interface{}, timeout time.Duration) (chan *http.Response, error) {
-	results, err := marshalData(data, auth)
-	if err != nil {
-		return (chan *http.Response)(nil), err
-	}
-	dat, aut := results["data"], results["auth"]
-	dataReadCloser := ioutil.NopCloser(bytes.NewBuffer(dat))
-	req, err := http.NewRequest("GET", url, dataReadCloser)
-	if err != nil {
-		return (chan *http.Response)(nil), err
-	}
-	var authData map[string]interface{}
-	if err = json.Unmarshal(aut, &authData); err != nil {
-		return (chan *http.Response)(nil), err
-	}
-	for user, password := range authData {
-		pw, ok := password.(string)
-		if !ok {
-			return (chan *http.Response)(nil), err
-		}
-		req.SetBasicAuth(user, pw)
-	}
-	client := &http.Client{Timeout: timeout}
-	reschan := make(chan *http.Response, 1)
-	go func(c chan *http.Response) error {
-		res, err := client.Do(req)
-		if err != nil {
-			return err
-		}
-		c <- res
-		return nil
-	}(reschan)
-	return reschan, nil
-}
-
 // Post sends a HTTP POST request to the provided URL, and
 // encode the data according to the appropriate bodyType.
-func Post(url, bodyType string, data interface{}) (*http.Response, error) {
-	dat, err := json.Marshal(data)
+//
+// redirect := func(r *requests.Request) {
+//           r.CheckRedirect = redirectPolicyFunc
+// }
+// resp, err := requests.Post("https://httpbin.org/post", "image/png", &buf, redirect)
+// if err != nil {
+//         panic(err)
+// }
+// fmt.Println(resp.JSON())
+//
+func Post(urlStr, bodyType string, body io.Reader, options ...func(*Request)) (*Response, error) {
+	req, err := http.NewRequest("POST", urlStr, body)
 	if err != nil {
 		return nil, err
 	}
-	dataReadCloser := ioutil.NopCloser(bytes.NewBuffer(dat))
-	res, err := http.DefaultClient.Post(url, bodyType, dataReadCloser)
-	if err != nil {
-		return (*http.Response)(nil), err
+	req.Header.Set("Content-Type", bodyType)
+	request := &Request{
+		Request: req,
+		Client:  &http.Client{},
+		Params:  url.Values{},
 	}
-	return res, nil
+
+	// Apply options in the parameters to request.
+	for _, option := range options {
+		option(request)
+	}
+	sURL, _ := url.Parse(urlStr)
+	sURL.RawQuery = request.Params.Encode()
+	req.URL = sURL
+
+	// Parse query values into r.Form and r.PostForm
+	err = req.ParseForm()
+	if err != nil {
+		return nil, err
+	}
+	resp, err := request.Client.Do(request.Request)
+	if err != nil {
+		return nil, err
+	}
+
+	// Wrap *http.Response with *Response
+	response := &Response{Response: resp}
+	return response, nil
+}
+
+// PostJSON aka UnsafePost! It marshals your data as JSON and set the bodyType
+// to "application/json" automatically.
+//
+// redirect := func(r *requests.Request) {
+//         r.CheckRedirect = redirectPolicyFunc
+// }
+//
+// first := map[string][]string{"foo": []string{"bar", "baz"}}
+// second := struct {Foo []string `json:"foo"`}{[]string{"bar", "baz"}}
+// payload := map[string][]interface{}{"twins": {first, second}}
+//
+// resp, err := requests.PostJSON("https://httpbin.org/post", payload, redirect)
+// if err != nil {
+//         panic(err)
+// }
+// fmt.Println(resp.StatusCode)
+//
+func PostJSON(urlStr string, body interface{}, options ...func(*Request)) (*Response, error) {
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	buf := bytes.NewBuffer(data)
+	req, err := http.NewRequest("POST", urlStr, buf)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	request := &Request{
+		Request: req,
+		Client:  &http.Client{},
+		Params:  url.Values{},
+	}
+	// Apply options in the parameters to request.
+	for _, option := range options {
+		option(request)
+	}
+	sURL, _ := url.Parse(urlStr)
+	sURL.RawQuery = request.Params.Encode()
+	req.URL = sURL
+
+	// Parse query values into r.Form and r.PostForm
+	err = req.ParseForm()
+	if err != nil {
+		return nil, err
+	}
+	resp, err := request.Client.Do(request.Request)
+	if err != nil {
+		return nil, err
+	}
+
+	// Wrap *http.Response with *Response
+	response := &Response{Response: resp}
+	return response, nil
 }
