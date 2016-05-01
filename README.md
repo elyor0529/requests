@@ -24,11 +24,12 @@ res, err := requests.Get("http://example.com", jsontype)
 
 ```
 
-#### Embedded `http.Request` and `http.Response`
-requests use [requests.Request](https://godoc.org/github.com/jochasinga/requests#Request)
-and [requests.Response](https://godoc.org/github.com/jochasinga/requests#Response)
+#### Embedded Standard Types
+requests use custom [Request](https://godoc.org/github.com/jochasinga/requests#Request)
+and [Response](https://godoc.org/github.com/jochasinga/requests#Response) types
+to embed standard `http.Request`, `http.Response`, and `http.Client`
 in order to insert helper methods and fields, make it easy to
-configure options atomically, and handle asynchronous errors (See [Types and Methods](#types-and-methods)).
+configure options atomically, and [handle asynchronous errors](#handling-async-errors)
 
 ```go
 
@@ -44,9 +45,11 @@ htmlStr := res.String()
 
 ```
 
+See [Types and Methods](#types-and-methods) for more information.
+
 #### Asynchronous API
 `requests.GetAsync` transparently returns a channel on which a response
-can be waited on (see [Handling Async Errors](#handling-async-errors)).
+can be waited on.
 
 ```go
 
@@ -56,11 +59,15 @@ content := res.Bytes()
 
 ```
 
+See [Handling Async Errors](#handling-async-errors) for more information.
+
 Install
 -------
 
 ```bash
+
 go get github.com/jochasinga/requests
+
 ```
 
 Examples
@@ -218,8 +225,10 @@ These methods will return an equivalent of `nil` for each return type if a
 certain condition isn't met. For instance:
 
 ```go
+
 res, _ := requests.Get("http://somecoolsite.io")
 fmt.Println(res.JSON())
+
 ```
 
 If the response from the server does not specify `Content-Type` as "application/json",
@@ -256,6 +265,14 @@ fmt.Println(res.StatusCode)
 `Response.Error` is default to `nil` when there is no error or when the response
 is received from a synchronous `Get`, since the error is already returned at the
 function's level.
+
+At this point, admittedly, `GetAsync` does not offer much more than a GET request
+in a goroutine. Go is already a language built with asynchronous I/O in mind, and
+in my opinion it does not need any extra async implementation. hat's why it
+decidedly returns a channel, Go's very native way of communication.    
+
+**requests** will try to be just a convenient HTTP tool. You're free to pick and
+choose the methods that suite you best.
 
 HTTP Test Servers
 -----------------
