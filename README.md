@@ -44,6 +44,18 @@ htmlStr := res.String()
 
 ```
 
+#### Asynchronous API
+`requests.GetAsync` transparently returns a channel on which a response
+can be waited on (see [Handling Async Errors](#handling-async-errors)).
+
+```go
+
+rc, _ := requests.GetAsync("http://httpbin.org/get")
+res := <-rc
+content := res.Bytes()
+
+```
+
 Install
 -------
 
@@ -119,19 +131,17 @@ if err != nil {
         panic(err)
 }
 
-// Do other things
+// Do other things...
 
-// Block and wait for the response
+// Block and wait.
 res := <-rc
+// Handle a "reject" this way.
 if res.Error != nil {
-	panic(resp.Error)
+	panic(res.Error)
 }
 fmt.Println(res.StatusCode)  // 200
 
 ```
-
-`requests.Response` has an `Error` field that carries any error caused by
-the internal goroutine to the main one so it can be handled.
 
 Alternatively, `select` can be used to poll channels asynchronously.
 
@@ -213,21 +223,26 @@ fmt.Println(res.JSON())
 ```
 
 If the response from the server does not specify `Content-Type` as "application/json",
-`resp.JSON()` will return an empty bytes slice. It panics if an attempt to parse
-the media type fails.
+`res.JSON()` will return an empty bytes slice. It panics if an attempt to parse
+the media type with `mime.ParseMediaType` fails.
 
-Another helper method, `ContentType()`, is a shortcut for
+Another helper method, `ContentType()`, is used to get the media type in the
+response's header.
 
 ```go
 
-mime.ParseMediaType(request.Header.Get("content-type"))
+mime, _, err := res.ContentType()
+if mime != "application/json" {
+	fmt.Printf("res.JSON() returns empty bytes")
+}
 
 ```
 
-#### `Handling Async Error`
-`requests.Response` contains an `Error` field which carries any error
-caused in the goroutine within `requests.GetAsync` downstream to the main
-goroutine. It is in some way like `reject` in Promise.
+#### `Handling Async Errors`
+`requests.Response` has an `Error` field which will contain any error
+caused in the goroutine within `requests.GetAsync` and carries it downstream
+to the main goroutine for proper handling (Think `reject` in Promise but
+less confusing).
 
 ```go
 rc, _ := requests.GetAsync("http://www.docker.io")
@@ -239,7 +254,7 @@ fmt.Println(res.StatusCode)
 ```
 
 `Response.Error` is default to `nil` when there is no error or when the response
-is received from a synchronous `Get`, since the error is already return at the
+is received from a synchronous `Get`, since the error is already returned at the
 function's level.
 
 HTTP Test Servers
