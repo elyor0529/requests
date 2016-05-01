@@ -7,31 +7,31 @@ Go HTTP Requests for Rodents (◕ᴥ◕)
 Introduction
 ------------
 **requests** is a minimal, atomic and expressive way of making HTTP requests.
-It is safe for all [rodents](http://www.styletails.com/wp-content/uploads/2014/06/guinea-pig-booboo-lieveheersbeestje-2.jpg), not just Gophers.
+It is inspired partly by the HTTP request libraries in other dynamic languages
+like Python and Javascript. It is safe for all [rodents](http://www.styletails.com/wp-content/uploads/2014/06/guinea-pig-booboo-lieveheersbeestje-2.jpg), not just Gophers.
 
-Differences
------------
 #### Functional Options
-Go has first-class functions, and passing them as option parameters to another
-function feels idiomatic, clean, and [makes a friendly, extensible API](http://dave.cheney.net/2014/10/17/functional-options-for-friendly-apis).
-I adopted this pattern after many feedbacks from the Go community.
+Passing first-class functions as optional parameters to another
+function is idiomatic, clean, and [makes a friendly, extensible API](http://dave.cheney.net/2014/10/17/functional-options-for-friendly-apis).
+This pattern is adopted after feedbacks from the Go community.
 
 ```go
-res, err := requests.Get("http://example.com", func(r *requests.Request) {
-	r.Header.Add("content-type", "application/json")
-})
-```
 
-However, just like in Javascript, the recommended way to pass in functional
-parameters is as declared variables rather than an anonymous ones.
+jsontype := func(r *requests.Request) {
+	r.Header.Add("content-type", "application/json")
+}
+res, err := requests.Get("http://example.com", jsontype)
+
+```
 
 #### Embedded `http.Request` and `http.Response`
 requests use [requests.Request](https://godoc.org/github.com/jochasinga/requests#Request)
 and [requests.Response](https://godoc.org/github.com/jochasinga/requests#Response)
-in order to insert special helpful methods and fields and make it possible to
-configure request's and client's options atomically.
+in order to insert helper methods and fields, make it easy to
+configure options atomically, and handle asynchronous errors (See [Types and Methods](#types-and-methods)).
 
 ```go
+
 timeout := func(r *requests.Request) {
 	r.Timeout = time.Duration(5) * time.Second
 }
@@ -39,7 +39,9 @@ res, err := requests.Get("http://example.com", timeout)
 if err != nil {
 	panic(err)
 }
+// helper methods
 htmlStr := res.String()
+
 ```
 
 Install
@@ -53,18 +55,22 @@ Examples
 --------
 #### GET requests
 Sending a basic GET request is straightforward.
+
 ```go
+
 res, err := requests.Get("http://httpbin.org/get")
 if err != nil {
         panic(err)
 }
 fmt.Println(res.StatusCode)  // 200
+
 ```
 
 To send additional data, such as a query parameter, or set basic authorization header
 or content type, use functional options.
 
 ```go
+
 // Add a query parameter
 addFoo := func(r *requests.Request) {
 	r.Params.Add("foo", "bar")
@@ -82,24 +88,28 @@ setMime := func(r *requests.Request) {
 
 // Pass as parameters to the function
 res, err := requests.Get("http://httpbin.org/get", addFoo, setAuth, setMime)
+
 ```
 
-Or everything goes into one functional option (less tedious).
+Or everything goes into one functional option.
 
 ```go
+
 opts := func(r *requests.Request) {
 	r.Params.Add("foo", "bar")
 	r.SetBasicAuth("user", "pass")
 	r.Header.Add("content-type", "application/json")
 }
 res, err := requests.Get("http://httpbin.org/get", opts)
+
 ```
 
 #### Asynchronous GET
-`requests.GetAsync` returns a channel `<-chan *Response`, on which you can
-wait for the response.
+`requests.GetAsync` returns a receive-only channel `<-chan *Response`, on which
+you response can be waited.
 
 ```go
+
 timeout := func(r *requests.Request) {
 	r.Timeout = time.Duration(5) * time.Second
 }
@@ -117,14 +127,16 @@ if resp.Error != nil {
 	panic(resp.Error)
 }
 fmt.Println(res.StatusCode)  // 200
+
 ```
 
 `requests.Response` has an `Error` field that carries any error caused by
 the internal goroutine to the main one so it can be handled.
 
-Use `select` to poll channels asynchronously.
+Alternatively, `select` can be used to poll channels asynchronously.
 
 ```go
+
 res1, _ := requests.GetAsync("http://google.com")
 res2, _ := requests.GetAsync("http://facebook.com")
 res3, _ := requests.GetAsync("http://docker.com")
@@ -139,43 +151,47 @@ for i := 0; i < 3; i++ {
     		fmt.Println(r3.StatusCode)
     	}
 }
+
 ```
 
 > TODO: `requests.Pool` coming soon.
 
 #### POST requests
-`requests.Post` is analogous to `http.Post`
+`requests.Post` is used to send POST requests
 
 ```go
+
 res, err := requests.Post("https://httpbin.org/post", "image/jpeg", &buf)
 ```
 
-except it also accept variadic number of functional options:
+It also accept variadic number of functional options:
 
 ```go
-addProtobuf := func(r *requests.Request) {
-        r.Header.Add("content-type", "application/x-protobuf")
+
+notimeout := func(r *requests.Request) {
+        r.Timeout = 0
 }
-res, err := requests.Post("https://httpbin.org/post", "application/json", &buf, addProtobuf)
+res, err := requests.Post("https://httpbin.org/post", "application/json", &buf, notimeout)
+
 ```
 
-`requests.PostJSON` aka "risky POST". It marshals your data as JSON and set the
-bodyType to "application/json" automatically.
+`requests.PostJSON` marshals your data as JSON and set `bodyType` to
+`application/json` implicitly.
 
 ```go
+
 first := map[string][]string{"foo": []string{"bar", "baz"}}
 second := struct {Foo []string `json:"foo"`}{[]string{"bar", "baz"}}
 payload := map[string][]interface{}{"twins": {first, second}}
 
-timeout := func(r *requests.Request) {
-	r.Timeout = time.Duration(15) * time.Second
-}
+res, err := requests.PostJSON("https://httpbin.org/post", data)
 
-res, err := requests.PostJSON("https://httpbin.org/post", data, timeout)
 ```
 
-#### More on `requests.Response`
-`requests.Response` provides extra byte-like methods such as:
+Types and Methods
+-----------------
+#### `requests.Response`
+Provides extra byte-like methods such as:
 + `Len() int`
 + `String() string`
 + `Bytes() []byte`
@@ -189,23 +205,22 @@ resp, _ := requests.Get("http://somecoolsite.io")
 fmt.Println(resp.JSON())
 ```
 
-If the response from the server does not specify `Content-Type` as `application/json`,
-`res.JSON()` will return an empty bytes slice. It panics if an attempt to parse
+If the response from the server does not specify `Content-Type` as "application/json",
+`resp.JSON()` will return an empty bytes slice. It panics if an attempt to parse
 the media type fails.
 
-Another helper method, `ContentType() (string, map[string]string, error)`, is
-an alias for
+Another helper method, `ContentType()`, is a shortcut for
 
 ```go
+
 mime.ParseMediaType(request.Header.Get("content-type"))
+
 ```
 
-#### Handling Error from Asynchronous Calls
-`requests.Response` also contains an `Error` field which carries any error
-caused after a goroutine within `requests.GetAsync` is spawned over to the main
-routine (Think reject in Promise).
-
-This is how you can handle such error:
+#### `Handling Async Error`
+`requests.Response` contains an `Error` field which carries any error
+caused in the goroutine within `requests.GetAsync` downstream to the main
+goroutine. It is in some way like `reject` in Promise.
 
 ```go
 rc, _ := requests.GetAsync("http://www.docker.io")
@@ -216,12 +231,18 @@ if res.Error != nil {
 fmt.Println(res.StatusCode)
 ```
 
-Awesome HTTP Tests
-------------------
+`Response.Error` is default to `nil` when there is no error or when the response
+is received from a synchronous `Get`, since the error is already return at the
+function's level.
+
+HTTP Test Servers
+-----------------
 Check out my other project [relay](https://github.com/jochasinga/relay),
-useful servers for end-to-end HTTP tests.
+useful test proxies and round-robin switchers for end-to-end HTTP tests.
 
 Disclaimer
 ----------
-This project is very young and is not yet production-ready, but it is growing everyday since I am currently working on this project alongside some other ideas unemployed. To support my ends in NYC
-and help me push commits, please consider [![Flattr this git repo](http://api.flattr.com/button/flattr-badge-large.png)](https://flattr.com/submit/auto?user_id=jochasinga&url=https://github.com/jochasinga/requests&title=Relay&language=English&tags=github&category=software) to fuel me with quality 🍵 or 🌟 this repo for spiritual octane.
+This project is very young, but it is growing everyday since I am currently
+working on this project alongside some other ideas unemployed. To support my
+ends in NYC and help me push commits, please consider [![Flattr this git repo](http://api.flattr.com/button/flattr-badge-large.png)](https://flattr.com/submit/auto?user_id=jochasinga&url=https://github.com/jochasinga/requests&title=Relay&language=English&tags=github&category=software) to fuel me with quality 🍵 or 🌟 this repo for spiritual octane.    
+Reach me at [@jochasinga](http://twitter.com/jochasinga).
