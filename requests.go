@@ -10,6 +10,53 @@ import (
 	"net/url"
 )
 
+// Head sends a HTTP HEAD request to the provided url with the
+// functional options to add query paramaters, headers, timeout, etc.
+//
+//     addMimeType := func(r *Request) {
+//             r.Header.Add("content-type", "application/json")
+//     }
+//
+//     resp, err := requests.Head("http://httpbin.org/get", addMimeType)
+//     if err != nil {
+//             panic(err)
+//     }
+//     fmt.Println(resp.StatusCode)
+//
+func Head(urlStr string, options ...func(*Request)) (*Response, error) {
+	req, err := http.NewRequest("HEAD", urlStr, nil)
+	if err != nil {
+		return nil, err
+	}
+	request := &Request{
+		Request: req,
+		Client:  &http.Client{},
+		Params:  url.Values{},
+	}
+
+	// Apply options in the parameters to request.
+	for _, option := range options {
+		option(request)
+	}
+	sURL, _ := url.Parse(urlStr)
+	sURL.RawQuery = request.Params.Encode()
+	req.URL = sURL
+
+	// Parse query values into r.Form
+	err = req.ParseForm()
+	if err != nil {
+		return nil, err
+	}
+	resp, err := request.Client.Do(request.Request)
+	if err != nil {
+		return nil, err
+	}
+
+	// Wrap *http.Response with *Response
+	response := &Response{Response: resp}
+	return response, nil
+}
+
 // Get sends a HTTP GET request to the provided url with the
 // functional options to add query paramaters, headers, timeout, etc.
 //
