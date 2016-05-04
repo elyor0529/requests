@@ -3,8 +3,10 @@ package requests
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"mime"
 	"net/http"
@@ -85,7 +87,14 @@ var (
 	notFoundHandler = func(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 	}
-
+	echoPostHandler = func(w http.ResponseWriter, r *http.Request) {
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			panic(err)
+		}
+		w.Header().Set("content-type", "application/json")
+		w.Write(body)
+	}
 	// Test tables and array of functional options to use in tests.
 	optList = [...][]func(*Request){
 		{fn1},
@@ -333,7 +342,7 @@ func TestGetAsyncResponseTimes(t *testing.T) {
 }
 
 // GetAsync should return immediately.
-func TestGetAsyncResponse(t *testing.T) {
+func TestGetAsyncResponseBody(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
 	defer ts.Close()
 	delay := time.Duration(1) * time.Second
@@ -361,6 +370,7 @@ func TestGetAsyncWithBadURL(t *testing.T) {
 	}
 }
 
+// Test if the response's body has the right type.
 func TestPostResponseType(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
 	defer ts.Close()
@@ -373,6 +383,42 @@ func TestPostResponseType(t *testing.T) {
 		expectedType := reflect.TypeOf(&Response{})
 		if resultType != expectedType {
 			t.Error(unexpectErr(resultType, expectedType))
+		}
+	}
+}
+
+// Test if the response's body is being echoed back right.
+func TestPostResponseBody(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(echoPostHandler))
+	defer ts.Close()
+	for _, arg := range postJSONArgs {
+		buf := new(bytes.Buffer)
+		err := json.NewEncoder(buf).Encode(arg)
+		if err != nil {
+			t.Error(err)
+		}
+		resp, err := Post(ts.URL, "application/json", buf)
+		if err != nil {
+			t.Error(err)
+		}
+		b := new(bytes.Buffer)
+		err = json.NewEncoder(b).Encode(arg)
+		if err != nil {
+			t.Error(err)
+		}
+		result := resp.String()
+		expected := b.String()
+		if result != expected {
+			t.Error(unexpectErr(result, expected))
+		}
+	}
+}
+
+func TestPostWithBadURLs(t *testing.T) {
+	for _, url := range badURLs {
+		_, err := Post(url, "", &bytes.Buffer{})
+		if err == nil {
+			t.Error(err)
 		}
 	}
 }
@@ -393,12 +439,83 @@ func TestPostJSONResponseType(t *testing.T) {
 	}
 }
 
-func TestPostWithBadURLs(t *testing.T) {
-	for _, url := range badURLs {
-		_, err := Post(url, "", &bytes.Buffer{})
-		if err == nil {
+// Test if the response's body is being echoed back right.
+func TestPostJSONResponseBody(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(echoPostHandler))
+	defer ts.Close()
+	for _, arg := range postJSONArgs {
+		resp, err := PostJSON(ts.URL, arg)
+		if err != nil {
 			t.Error(err)
 		}
+		b := new(bytes.Buffer)
+		err = json.NewEncoder(b).Encode(arg)
+		if err != nil {
+			t.Error(err)
+		}
+		result := resp.JSON()
+		expected := b.Bytes()
+		if bytes.Compare(result, expected) != 0 {
+			t.Error(unexpectErr(result, expected))
+		}
+	}
+}
+
+func TestPostAsyncResponseType(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
+	defer ts.Close()
+	rc, err := PostAsync(ts.URL, "", &bytes.Buffer{})
+	if err != nil {
+		t.Error(err)
+	}
+	expectedType := reflect.TypeOf((<-chan *Response)(nil))
+	resultType := reflect.TypeOf(rc)
+	if resultType != expectedType {
+		t.Error(unexpectErr(resultType, expectedType))
+	}
+}
+
+// PostAsync should return immediately.
+func TestPostAsyncResponseTimes(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
+	defer ts.Close()
+	deviation := time.Duration(10) * time.Millisecond
+	for _, tt := range getFuncSyncTestTable {
+		delay := time.Duration(tt.delay) * time.Second
+		expected := time.Duration(tt.expected)*time.Second + deviation
+		p := relay.NewProxy(delay, ts)
+		start := time.Now()
+		_, _ = PostAsync(p.URL, "", &bytes.Buffer{})
+		elapsed := time.Since(start)
+		if elapsed >= expected {
+			t.Error(unexpectErr(elapsed, expected))
+		}
+	}
+}
+
+func TestPostAsyncResponseBody(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
+	defer ts.Close()
+	rc, err := PostAsync(ts.URL, "", &bytes.Buffer{})
+	if err != nil {
+		t.Error(err)
+	}
+	resp := <-rc
+	if resp.Error != nil {
+		t.Error(resp.Error)
+	}
+	result := resp.String()
+	if result != "Hello world!" {
+		t.Error(unexpectErr(result, "Hello world!"))
+	}
+}
+
+// FIXME: Cannot loop through bad URLs for this test
+// probably due to the goroutine.
+func TestPostAsyncWithBadURL(t *testing.T) {
+	_, err := PostAsync(":ebg:htwe.com", "", &bytes.Buffer{})
+	if err == nil {
+		t.Error(err)
 	}
 }
 
@@ -480,5 +597,17 @@ func TestResponseContentType(t *testing.T) {
 	}
 	if result != expected {
 		t.Error(unexpectErr(result, expected))
+	}
+}
+
+func TestResponseWithoutContentType(t *testing.T) {
+	resp := &Response{
+		Response: &http.Response{
+			Header: http.Header{},
+		},
+	}
+	_, _, err := resp.ContentType()
+	if err == nil {
+		t.Error(err)
 	}
 }

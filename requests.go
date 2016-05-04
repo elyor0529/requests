@@ -158,6 +158,45 @@ func Post(urlStr, bodyType string, body io.Reader, options ...func(*Request)) (*
 	return response, nil
 }
 
+// PostAsync sends a HTTP POST request to the provided URL, body type,
+// and body, and returns a <-chan *http.Response immediately.
+//
+// redirect := func(r *requests.Request) {
+//           r.CheckRedirect = redirectPolicyFunc
+// }
+// resp, err := requests.PostAsync("https://httpbin.org/post", "image/png", &buf, redirect)
+// if err != nil {
+//         panic(err)
+// }
+//
+// resp := <-rc
+// if resp.Error != nil {
+//     panic(resp.Error)
+// }
+// fmt.Println(resp.String())
+//
+func PostAsync(urlStr, bodyType string, body io.Reader, options ...func(*Request)) (<-chan *Response, error) {
+	request, err := wrapRequest("POST", urlStr, body, options)
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Set("Content-Type", bodyType)
+	rc := make(chan *Response)
+	go func() {
+		resp, err := request.Client.Do(request.Request)
+		// Wrap *http.Response with *Response
+		response := &Response{}
+		if err != nil {
+			response.Error = err
+			rc <- response
+		}
+		response.Response = resp
+		rc <- response
+		close(rc)
+	}()
+	return rc, nil
+}
+
 // PostJSON aka UnsafePost! It marshals your data as JSON and set the bodyType
 // to "application/json" automatically.
 //
@@ -176,11 +215,11 @@ func Post(urlStr, bodyType string, body io.Reader, options ...func(*Request)) (*
 // fmt.Println(resp.StatusCode)
 //
 func PostJSON(urlStr string, body interface{}, options ...func(*Request)) (*Response, error) {
-	data, err := json.Marshal(body)
+	buf := new(bytes.Buffer)
+	err := json.NewEncoder(buf).Encode(body)
 	if err != nil {
 		return nil, err
 	}
-	buf := bytes.NewBuffer(data)
 	request, err := wrapRequest("POST", urlStr, buf, options)
 	if err != nil {
 		return nil, err
