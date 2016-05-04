@@ -352,17 +352,14 @@ func TestGetAsyncResponse(t *testing.T) {
 	}
 }
 
-/*
-// TODO: This needs to be fixed
-func TestGetAsyncWithBadURLs(t *testing.T) {
-	for _, url := range badURLs {
-		_, err := GetAsync(url)
-		if err == nil {
-			t.Error(err)
-		}
+// FIXME: Cannot loop through bad URLs for this test
+// probably due to the goroutine.
+func TestGetAsyncWithBadURL(t *testing.T) {
+	_, err := GetAsync(":ebg:htwe.com")
+	if err == nil {
+		t.Error(err)
 	}
 }
-*/
 
 func TestPostResponseType(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
