@@ -272,7 +272,7 @@ if mime != "application/json" {
 
 ```
 
-#### `Handling Async Errors`
+#### Handling Async Errors
 `requests.Response` also has an `Error` field which will contain any error
 caused in the goroutine within `requests.GetAsync` and carries it downstream
 to the main goroutine for proper handling (Think `reject` in Promise but more
