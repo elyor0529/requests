@@ -10,21 +10,8 @@ import (
 	"net/url"
 )
 
-// Head sends a HTTP HEAD request to the provided url with the
-// functional options to add query paramaters, headers, timeout, etc.
-//
-//     addMimeType := func(r *Request) {
-//             r.Header.Add("content-type", "application/json")
-//     }
-//
-//     resp, err := requests.Head("http://httpbin.org/get", addMimeType)
-//     if err != nil {
-//             panic(err)
-//     }
-//     fmt.Println(resp.StatusCode)
-//
-func Head(urlStr string, options ...func(*Request)) (*Response, error) {
-	req, err := http.NewRequest("HEAD", urlStr, nil)
+func wrapRequest(method, urlStr string, body io.Reader, options []func(*Request)) (*Request, error) {
+	req, err := http.NewRequest(method, urlStr, body)
 	if err != nil {
 		return nil, err
 	}
@@ -44,6 +31,27 @@ func Head(urlStr string, options ...func(*Request)) (*Response, error) {
 
 	// Parse query values into r.Form
 	err = req.ParseForm()
+	if err != nil {
+		return nil, err
+	}
+	return request, nil
+}
+
+// Head sends a HTTP HEAD request to the provided url with the
+// functional options to add query paramaters, headers, timeout, etc.
+//
+//     addMimeType := func(r *Request) {
+//             r.Header.Add("content-type", "application/json")
+//     }
+//
+//     resp, err := requests.Head("http://httpbin.org/get", addMimeType)
+//     if err != nil {
+//             panic(err)
+//     }
+//     fmt.Println(resp.StatusCode)
+//
+func Head(urlStr string, options ...func(*Request)) (*Response, error) {
+	request, err := wrapRequest("HEAD", urlStr, nil, options)
 	if err != nil {
 		return nil, err
 	}
@@ -71,26 +79,7 @@ func Head(urlStr string, options ...func(*Request)) (*Response, error) {
 //     fmt.Println(resp.StatusCode)
 //
 func Get(urlStr string, options ...func(*Request)) (*Response, error) {
-	req, err := http.NewRequest("GET", urlStr, nil)
-	if err != nil {
-		return nil, err
-	}
-	request := &Request{
-		Request: req,
-		Client:  &http.Client{},
-		Params:  url.Values{},
-	}
-
-	// Apply options in the parameters to request.
-	for _, option := range options {
-		option(request)
-	}
-	sURL, _ := url.Parse(urlStr)
-	sURL.RawQuery = request.Params.Encode()
-	req.URL = sURL
-
-	// Parse query values into r.Form
-	err = req.ParseForm()
+	request, err := wrapRequest("GET", urlStr, nil, options)
 	if err != nil {
 		return nil, err
 	}
@@ -121,23 +110,7 @@ func Get(urlStr string, options ...func(*Request)) (*Response, error) {
 //     fmt.Println(resp.String())
 //
 func GetAsync(urlStr string, options ...func(*Request)) (<-chan *Response, error) {
-	req, err := http.NewRequest("GET", urlStr, nil)
-	if err != nil {
-		return nil, err
-	}
-	request := &Request{
-		Request: req,
-		Client:  &http.Client{},
-		Params:  url.Values{},
-	}
-	for _, option := range options {
-		option(request)
-	}
-	sURL, _ := url.Parse(urlStr)
-	sURL.RawQuery = request.Params.Encode()
-	req.URL = sURL
-	// Parse query values into r.Form
-	err = req.ParseForm()
+	request, err := wrapRequest("GET", urlStr, nil, options)
 	if err != nil {
 		return nil, err
 	}
@@ -170,30 +143,11 @@ func GetAsync(urlStr string, options ...func(*Request)) (<-chan *Response, error
 // fmt.Println(resp.JSON())
 //
 func Post(urlStr, bodyType string, body io.Reader, options ...func(*Request)) (*Response, error) {
-	req, err := http.NewRequest("POST", urlStr, body)
+	request, err := wrapRequest("POST", urlStr, body, options)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", bodyType)
-	request := &Request{
-		Request: req,
-		Client:  &http.Client{},
-		Params:  url.Values{},
-	}
-
-	// Apply options in the parameters to request.
-	for _, option := range options {
-		option(request)
-	}
-	sURL, _ := url.Parse(urlStr)
-	sURL.RawQuery = request.Params.Encode()
-	req.URL = sURL
-
-	// Parse query values into r.Form and r.PostForm
-	err = req.ParseForm()
-	if err != nil {
-		return nil, err
-	}
+	request.Header.Set("Content-Type", bodyType)
 	resp, err := request.Client.Do(request.Request)
 	if err != nil {
 		return nil, err
@@ -227,29 +181,11 @@ func PostJSON(urlStr string, body interface{}, options ...func(*Request)) (*Resp
 		return nil, err
 	}
 	buf := bytes.NewBuffer(data)
-	req, err := http.NewRequest("POST", urlStr, buf)
+	request, err := wrapRequest("POST", urlStr, buf, options)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", "application/json")
-	request := &Request{
-		Request: req,
-		Client:  &http.Client{},
-		Params:  url.Values{},
-	}
-	// Apply options in the parameters to request.
-	for _, option := range options {
-		option(request)
-	}
-	sURL, _ := url.Parse(urlStr)
-	sURL.RawQuery = request.Params.Encode()
-	req.URL = sURL
-
-	// Parse query values into r.Form and r.PostForm
-	err = req.ParseForm()
-	if err != nil {
-		return nil, err
-	}
+	request.Header.Set("Content-Type", "application/json")
 	resp, err := request.Client.Do(request.Request)
 	if err != nil {
 		return nil, err
