@@ -3,7 +3,6 @@ package requests
 import (
 	"bytes"
 	"io"
-	"log"
 	"mime"
 	"net/http"
 	"net/url"
@@ -76,12 +75,11 @@ func (r *Response) JSON() []byte {
 	for _, ct := range r.Header["Content-Type"] {
 		t, _, err := mime.ParseMediaType(ct)
 		if err != nil {
-			log.Panicln(err)
+			return jsn
 		}
 		if strings.Contains(t, "application/json") {
 			jsn = r.Bytes()
 		}
-
 	}
 	return jsn
 }
