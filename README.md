@@ -2,7 +2,7 @@
 
 requests
 ========
-[![GoDoc](https://godoc.org/github.com/jochasinga/requests?status.svg)](https://godoc.org/github.com/jochasinga/requests)   [![Build Status](https://travis-ci.org/jochasinga/requests.svg?branch=master)](https://travis-ci.org/jochasinga/requests)   [![Coverage Status](https://coveralls.io/repos/github/jochasinga/requests/badge.svg?branch=master)](https://coveralls.io/github/jochasinga/requests?branch=master)   [![Flattr this git repo](http://api.flattr.com/button/flattr-badge-large.png)](https://flattr.com/submit/auto?user_id=jochasinga&url=https://github.com/jochasinga/requests&title=Relay&language=English&tags=github&category=software)
+[![GoDoc](https://godoc.org/github.com/jochasinga/requests?status.svg)](https://godoc.org/github.com/jochasinga/requests)   [![Build Status](https://travis-ci.org/jochasinga/requests.svg?branch=master)](https://travis-ci.org/jochasinga/requests)   [![Coverage Status](https://coveralls.io/repos/github/jochasinga/requests/badge.svg?branch=master)](https://coveralls.io/github/jochasinga/requests?branch=master)     [![Donate](https://img.shields.io/badge/donate-$1-yellow.svg)](https://www.paypal.me/jochasinga/1.00)
 
 Functional HTTP Requests in Go.
 
@@ -70,7 +70,7 @@ content := res.Bytes()
 
 ```
 
-See [requests.GetAsync](#requestsgetasync) and [Handling Async Errors](#handling-async-errors)
+See [Asynchronous APIs](#asynchronous-apis) and [Handling Async Errors](#handling-async-errors)
 for more usage information.
 
 Install
@@ -188,6 +188,8 @@ res, err := requests.PostJSON("https://httpbin.org/post", payload)
 ### `requests.Head`
 HEAD requests are also supported with same signature as `requests.Get`.
 
+Asynchronous APIs
+-----------------
 ### `requests.GetAsync`
 After parsing all the options, `GetAsync` spawns a goroutine to send a GET request and return `<-chan *Response` right away on which `*Response` can be waited.
 
@@ -362,9 +364,11 @@ HTTP Test Servers
 Check out my other project [relay](https://github.com/jochasinga/relay),
 useful test proxies and round-robin switchers for end-to-end HTTP tests.
 
+Contribution
+------------
+Yes, please fork away.
+
 Disclaimer
 ----------
-This project is very young, but it is growing everyday since I am currently
-working on this project alongside some other ideas unemployed. To support my
-ends in NYC and help me push commits, please consider [![Flattr this git repo](http://api.flattr.com/button/flattr-badge-large.png)](https://flattr.com/submit/auto?user_id=jochasinga&url=https://github.com/jochasinga/requests&title=Relay&language=English&tags=github&category=software) to fuel me with quality 🍵 or 🌟 this repo for spiritual octane.    
+To support my ends in NYC and help me push commits, please consider [![Donate](https://img.shields.io/badge/donate-$3-yellow.svg)](https://www.paypal.me/jochasinga/1.00) to fuel me with quality 🍵 or 🌟 this repo for spiritual octane.    
 Reach me at [@jochasinga](http://twitter.com/jochasinga).
