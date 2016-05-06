@@ -11,8 +11,20 @@ Introduction
 requests is a minimal, atomic, and functional way of making HTTP requests.
 It is safe for all [rodents](http://www.styletails.com/wp-content/uploads/2014/06/guinea-pig-booboo-lieveheersbeestje-2.jpg), not just Gophers.
 
+Purpose
+-------
+I want to create a Go HTTP request package that would:
++ Stay true to [net/http](https://golang.org/pkg/net/http/) APIs.
++ Atomic--that means one doesn't have to go back to `net/http` doc all the time.
++ Wrap useful operations such as [asynchronous requests](#asynchronous-apis) and [sending JSON](#requestspostjson).
++ Stay idiomatic to the language.
+
+Usage  
+-----
+the following are the core differences from the standard `net/http` package.
+
 ### Functional Options
-requests employs functional options as parameters, this approach being
+requests employs functional options as optional parameters, this approach being
 idiomatic, clean, and [makes a friendly, extensible API](http://dave.cheney.net/2014/10/17/functional-options-for-friendly-apis).
 This pattern is adopted after feedback from the Go community.
 
@@ -28,13 +40,15 @@ res, err := requests.Get("http://example.com", jsontype)
 ### Embedded Standard Types
 requests uses custom [Request](https://godoc.org/github.com/jochasinga/requests#Request)
 and [Response](https://godoc.org/github.com/jochasinga/requests#Response) types
-to embed standard `http.Request`, `http.Response`, and `http.Client`
-in order to insert helper methods, make it easy to configure options atomically,
-and [handle asynchronous errors using a special field](#handling-async-errors).
+to embed standard [http.Request](https://golang.org/pkg/net/http/#Request), [http.Response](https://golang.org/pkg/net/http/#Response), and [http.Client](https://golang.org/pkg/net/http/#Client)
+in order to insert helper methods, make configuring options atomic,
+and [handle asynchronous errors](#handling-async-errors).
 
 ```go
 
 timeout := func(r *requests.Request) {
+
+        // Set Timeout on *Request instead of *http.Client
         r.Timeout = time.Duration(5) * time.Second
 }
 res, err := requests.Get("http://example.com", timeout)
@@ -59,18 +73,23 @@ All return a receive-only channel on which `*requests.Response` can be waited on
 
 ```go
 
-rc, _ := requests.GetAsync("http://httpbin.org/get")
+rc, err := requests.GetAsync("http://httpbin.org/get")
+if err != nil {
+        panic(err)
+}
 res := <-rc
+
 // Handle connection errors.
 if res.Error != nil {
         panic(res.Error)
 }
+
 // Helper method
 content := res.Bytes()
 
 ```
 
-See [Asynchronous APIs](#asynchronous-apis) and [Handling Async Errors](#handling-async-errors)
+See [Async](#async) and [Handling Async Errors](#handling-async-errors)
 for more usage information.
 
 Install
@@ -84,7 +103,7 @@ go get github.com/jochasinga/requests
 
 Testing
 -------
-requests uses Go standard `testing` package. Simple run this in the project's directory:
+requests uses Go standard `testing` package. Run this in the project's directory:
 
 ```bash
 
@@ -103,6 +122,7 @@ res, err := requests.Get("http://httpbin.org/get")
 if err != nil {
         panic(err)
 }
+
 fmt.Println(res.StatusCode)  // 200
 
 ```
@@ -132,7 +152,7 @@ res, err := requests.Get("http://httpbin.org/get", addFoo, setAuth, setMime)
 
 ```
 
-Or everything goes into one functional option.
+Or configure everything in one function.
 
 ```go
 
@@ -146,7 +166,7 @@ res, err := requests.Get("http://httpbin.org/get", opts)
 ```
 
 ### `requests.Post`
-Send POST requests with specific `bodyType` and `body`.
+Send POST requests with specified `bodyType` and `body`.
 
 ```go
 
@@ -188,10 +208,10 @@ res, err := requests.PostJSON("https://httpbin.org/post", payload)
 ### `requests.Head`
 HEAD requests are also supported with same signature as `requests.Get`.
 
-Asynchronous APIs
------------------
+Async
+-----
 ### `requests.GetAsync`
-After parsing all the options, `GetAsync` spawns a goroutine to send a GET request and return `<-chan *Response` right away on which `*Response` can be waited.
+After parsing all the options, `GetAsync` spawns a goroutine to send a GET request and return `<-chan *Response` immediately on which `*Response` can be waited.
 
 ```go
 
@@ -213,11 +233,12 @@ res := <-rc
 if res.Error != nil {
 	panic(res.Error)
 }
+
 fmt.Println(res.StatusCode)  // 200
 
 ```
 
-`select` can be used to poll many channels asynchronously.
+`select` can be used to poll many channels asynchronously like normal.
 
 ```go
 
@@ -238,13 +259,35 @@ for i := 0; i < 3; i++ {
 
 ```
 
-Alternatively, `requests.Pool` can be used.
+Alternatively, [requests.Pool](#requestspool) can be used to collect concurrent responses.
 
 ### `requests.PostAsync`
 An asynchronous counterpart of `requests.Post`.
 
+```go
+
+query := bytes.NewBufferString(`{
+        "query" : {
+                "term" : { "user" : "poco" }
+        }
+}`)
+
+// Sending DSL query to Elasticsearch server
+rc, err := PostAsync("http://localhost:9200/users/_search", "application/json", query)
+if err != nil {
+        t.Error(err)
+}
+resp := <-rc
+if resp.Error != nil {
+        t.Error(resp.Error)
+}
+result := resp.JSON()
+
+```
+
 ### `requests.Pool`
-Contains a `Responses` field of type `chan *Response` with variable-sized buffer specified in the constructor. `Pool` is used to collect in-bound responses being sent from many HTTP requests.
+Contains a `Responses` field of type `chan *Response` with variable-sized buffer specified in the constructor. `Pool` is used to collect in-bound responses sent from numbers of goroutines corresponding
+to the number of URLs provided in the slice.
 
 ```go
 
@@ -274,6 +317,8 @@ for res := range results {
 }
 
 ```
+
+`Pool.Responses` channel is closed internally when all the responses are sent.
 
 Types and Methods
 -----------------
@@ -319,14 +364,26 @@ If the response from the server does not specify `Content-Type` as "application/
 `res.JSON()` will return an empty bytes slice. It does not panic if the content type
 is empty.
 
-Another helper method, `ContentType()`, is used to get the media type in the
-response's header.
+These methods close the response's body automatically.
+
+Another helper method, `ContentType`, is used to get the media type in the
+response's header, and can be used with the helper methods to determine the
+type before reading the output.
 
 ```go
 
 mime, _, err := res.ContentType()
-if mime != "application/json" {
-        fmt.Printf("res.JSON() returns empty %v", res.JSON())
+if err != nil {
+        panic(err)
+}
+
+switch mime {
+case "application/json":
+        fmt.Println(res.JSON())
+case "text/html", "text/plain":
+        fmt.Println(res.String())
+default:
+        fmt.Println(res.Bytes())
 }
 
 ```
@@ -334,30 +391,31 @@ if mime != "application/json" {
 ### Handling Async Errors
 `requests.Response` also has an `Error` field which will contain any error
 caused in the goroutine within `requests.GetAsync` and carries it downstream
-to the main goroutine for proper handling (Think `reject` in Promise but more
+for proper handling (Think `reject` in Promise but more
 straightforward in Go-style).
 
 ```go
-rc, _ := requests.GetAsync("http://www.docker.io")
+
+rc, err := requests.GetAsync("http://www.docker.io")
+
+// This error is returned before the goroutine i.e. malformed URL.
+if err != nil {
+        panic(err)
+}
+
 res := <-rc
+
+// This connection error is "attached" to the response.
 if res.Error != nil {
 	panic(res.Error)
 }
+
 fmt.Println(res.StatusCode)
+
 ```
 
 `Response.Error` is default to `nil` when there is no error or when the response
-is received from a synchronous `Get`, since the error is already returned at the
-function's level.
-
-At this point `GetAsync` does not offer much more than a GET request
-in a goroutine. Go is already a language built for async first-hand, and
-in my opinion it does not need any extra async implementation. `GetAsync`
-decidedly returns a channel, Go's native way of communication, instead
-of a layer of abstraction like a Promise.
-
-**requests** will try to be thin. You're free to pick and choose the method
-that suite you best.
+is being retrieved from a synchronous function.
 
 HTTP Test Servers
 -----------------
