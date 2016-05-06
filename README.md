@@ -70,7 +70,7 @@ content := res.Bytes()
 
 ```
 
-See [Asynchronous APIs](#asynchronous-apis) and [Handling Async Errors](#handling-async-errors)
+See [requests.GetAsync](#requestsgetasync) and [Handling Async Errors](#handling-async-errors)
 for more usage information.
 
 Install
@@ -188,8 +188,6 @@ res, err := requests.PostJSON("https://httpbin.org/post", payload)
 ### `requests.Head`
 HEAD requests are also supported with same signature as `requests.Get`.
 
-Asynchronous APIs
------------------
 ### `requests.GetAsync`
 After parsing all the options, `GetAsync` spawns a goroutine to send a GET request and return `<-chan *Response` right away on which `*Response` can be waited.
 
