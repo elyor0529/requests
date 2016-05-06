@@ -2,6 +2,7 @@
 package requests
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -56,5 +57,13 @@ func TestPoolGetURLs(t *testing.T) {
 	resp3 := <-rc
 	if resp3.StatusCode != 200 {
 		t.Error(unexpectErr(resp3.StatusCode, 200))
+	}
+}
+
+func TestPoolGetBadURLs(t *testing.T) {
+	p := NewPool(3)
+	_, err := p.Get(badURLs)
+	if err == nil {
+		t.Error(errors.New("Should return an error."))
 	}
 }

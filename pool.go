@@ -1,21 +1,20 @@
 // Package requests provide useful and declarative methods for RESTful HTTP requests.
 package requests
 
-import (
-	"fmt"
-	"sync"
-)
+import "sync"
 
 // Pool represents a variable-sized bufferred channel of type *Response
 // which collects results from each request in a goroutine.
 type Pool struct {
-	Responses chan *Response
+	Responses    chan *Response
+	IgnoreBadURL bool
 }
 
 // NewPool creates a *Pool instance with the channel's buffer size of max.
 func NewPool(max int) *Pool {
 	return &Pool{
-		Responses: make(chan *Response, max),
+		Responses:    make(chan *Response, max),
+		IgnoreBadURL: false,
 	}
 }
 
@@ -33,7 +32,9 @@ func (p *Pool) Get(urls []string, options ...func(*Request)) (<-chan *Response, 
 	for _, url := range urls {
 		rc, err := GetAsync(url, options...)
 		if err != nil {
-			fmt.Println(err)
+			if p.IgnoreBadURL == false {
+				return nil, err
+			}
 		}
 		go output(rc)
 	}

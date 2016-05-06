@@ -291,21 +291,27 @@ to the number of URLs provided in the slice.
 
 ```go
 
-// Create a pool with the maximum buffer size.
-p := requests.NewPool(10)
 urls := []string{
-        "http://httpbin.org/get",
-        "http://docker.com",
-        "http://medium.com/@jochasinga",
         "http://golang.org",
         "http://google.com",
+        "http://docker.com",
+        "http://medium.com",
         "http://example.com",
+        "http://httpbin.org/get",
+        "https://en.wikipedia.org",
 }
+
+// Create a pool with the maximum buffer size.
+p := requests.NewPool(10)
 opts := func(r *requests.Request) {
         r.Header.Set("user-agent", "GoBot(http://example.org/"))
         r.Timeout = time.Duration(10) * time.Second
 }
+
 results, err := p.Get(urls, opts)
+
+// An error is returned when an attempt to construct a
+// request fails, probably from a malformed URL.
 if err != nil {
         panic(err)
 }
@@ -315,6 +321,19 @@ for res := range results {
         }
         fmt.Println(res.StatusCode)
 }
+
+```
+
+You may want to ignore errors from malformed URLs instead of handling each of them,
+for instance, when crawling mass URLs.
+
+To suppress the errors from being returned, set the `IgnoreBadURL` field to `true`:
+
+```go
+
+results, _ := p.Get(urls, func(r *requests.Request) {
+        r.IgnoreBadURL = false
+})
 
 ```
 
