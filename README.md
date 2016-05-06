@@ -50,8 +50,12 @@ htmlStr := res.String()
 See [Types and Methods](#types-and-methods) for more information.
 
 ### Asynchronous APIs
-requests provides wrapper around sending an HTTP request in a goroutine , namely `requests.GetAsync` and  `requests.PostAsync`. Both return a channel on which a
-`*requests.Response` can be waited on.
+requests provides the following abstractions around sending HTTP requests in goroutines:
++ `requests.GetAsync`
++ `requests.PostAsync`
++ `requests.Pool`
+
+All return a receive-only channel on which `*requests.Response` can be waited on.
 
 ```go
 
@@ -66,7 +70,8 @@ content := res.Bytes()
 
 ```
 
-See [Handling Async Errors](#handling-async-errors) for more information on how to handle connection errors from the goroutine.
+See [Asynchronous APIs](#asynchronous-apis) and [Handling Async Errors](#handling-async-errors)
+for more usage information.
 
 Install
 -------
@@ -140,8 +145,53 @@ res, err := requests.Get("http://httpbin.org/get", opts)
 
 ```
 
+### `requests.Post`
+Send POST requests with specific `bodyType` and `body`.
+
+```go
+
+res, err := requests.Post("https://httpbin.org/post", "image/jpeg", &buf)
+
+```
+
+It also accepts variadic number of functional options:
+
+```go
+
+notimeout := func(r *requests.Request) {
+        r.Timeout = 0
+}
+res, err := requests.Post("https://httpbin.org/post", "application/json", &buf, notimeout)
+
+```
+
+### `requests.PostJSON`
+Encode your map or struct data as JSON and set `bodyType` to `application/json` implicitly.
+
+```go
+
+first := map[string][]string{
+        "foo": []string{"bar", "baz"},
+}
+second := struct {
+        Foo []string `json:"foo"`
+}{[]string{"bar", "baz"}}
+
+payload := map[string][]interface{}{
+        "twins": {first, second}
+}
+
+res, err := requests.PostJSON("https://httpbin.org/post", payload)
+
+```
+
+### `requests.Head`
+HEAD requests are also supported with same signature as `requests.Get`.
+
+Asynchronous APIs
+-----------------
 ### `requests.GetAsync`
-After parsing all the options, spawn a goroutine to send a GET request and return `<-chan *Response` right away on which you response can be waited.
+After parsing all the options, `GetAsync` spawns a goroutine to send a GET request and return `<-chan *Response` right away on which `*Response` can be waited.
 
 ```go
 
@@ -167,7 +217,7 @@ fmt.Println(res.StatusCode)  // 200
 
 ```
 
-Alternatively, `select` can be used to poll channels asynchronously.
+`select` can be used to poll many channels asynchronously.
 
 ```go
 
@@ -188,49 +238,43 @@ for i := 0; i < 3; i++ {
 
 ```
 
-### `requests.Post`
-Send POST requests with specific `bodyType` and `body`.
-
-```go
-
-res, err := requests.Post("https://httpbin.org/post", "image/jpeg", &buf)
-
-```
-
-It also accepts variadic number of functional options:
-
-```go
-
-notimeout := func(r *requests.Request) {
-        r.Timeout = 0
-}
-res, err := requests.Post("https://httpbin.org/post", "application/json", &buf, notimeout)
-
-```
+Alternatively, `requests.Pool` can be used.
 
 ### `requests.PostAsync`
-An asynchronous counterpart of `requests.Post`. Works similar to `requests.GetAsync`.
+An asynchronous counterpart of `requests.Post`.
 
-### `requests.PostJSON`
-Encode your map or struct data as JSON and set `bodyType`
-to `application/json` implicitly.
+### `requests.Pool`
+Contains a `Responses` field of type `chan *Response` with variable-sized buffer specified in the constructor. `Pool` is used to collect in-bound responses being sent from many HTTP requests.
 
 ```go
 
-first := map[string][]string{
-        "foo": []string{"bar", "baz"},
+// Create a pool with the maximum buffer size.
+p := requests.NewPool(10)
+urls := []string{
+        "http://httpbin.org/get",
+        "http://docker.com",
+        "http://medium.com/@jochasinga",
+        "http://golang.org",
+        "http://google.com",
+        "http://example.com",
 }
-second := struct {
-        Foo []string `json:"foo"`
-}{[]string{"bar", "baz"}}
-
-payload := map[string][]interface{}{
-        "twins": {first, second}
+opts := func(r *requests.Request) {
+        r.Header.Set("user-agent", "GoBot(http://example.org/"))
+        r.Timeout = time.Duration(10) * time.Second
 }
-
-res, err := requests.PostJSON("https://httpbin.org/post", payload)
+results, err := p.Get(urls, opts)
+if err != nil {
+        panic(err)
+}
+for res := range results {
+        if res.Error != nil {
+                panic(res.Error)
+        }
+        fmt.Println(res.StatusCode)
+}
 
 ```
+
 Types and Methods
 -----------------
 ### `requests.Request`
