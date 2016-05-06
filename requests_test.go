@@ -4,6 +4,7 @@ package requests
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -224,7 +225,7 @@ func TestHeadWithBadURLs(t *testing.T) {
 	for _, url := range badURLs {
 		_, err := Head(url)
 		if err == nil {
-			t.Error(err)
+			t.Error(errors.New("Should return an error."))
 		}
 	}
 }
@@ -304,7 +305,7 @@ func TestGetWithBadURLs(t *testing.T) {
 	for _, url := range badURLs {
 		_, err := Get(url)
 		if err == nil {
-			t.Error(err)
+			t.Error(errors.New("Should return an error."))
 		}
 	}
 }
@@ -366,7 +367,7 @@ func TestGetAsyncResponseBody(t *testing.T) {
 func TestGetAsyncWithBadURL(t *testing.T) {
 	_, err := GetAsync(":ebg:htwe.com")
 	if err == nil {
-		t.Error(err)
+		t.Error(errors.New("Should return an error."))
 	}
 }
 
@@ -418,7 +419,7 @@ func TestPostWithBadURLs(t *testing.T) {
 	for _, url := range badURLs {
 		_, err := Post(url, "", &bytes.Buffer{})
 		if err == nil {
-			t.Error(err)
+			t.Error(errors.New("Should return an error."))
 		}
 	}
 }
@@ -515,9 +516,65 @@ func TestPostAsyncResponseBody(t *testing.T) {
 func TestPostAsyncWithBadURL(t *testing.T) {
 	_, err := PostAsync(":ebg:htwe.com", "", &bytes.Buffer{})
 	if err == nil {
-		t.Error(err)
+		t.Error(errors.New("Should return an error."))
 	}
 }
+
+/******************* PUT ******************************/
+// Test if the response's body has the right type.
+func TestPutResponseType(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
+	defer ts.Close()
+	for _, tt := range postFuncTestTable {
+		resp, err := Put(ts.URL, tt.bodyType, tt.body, tt.opts...)
+		if err != nil {
+			t.Error(err)
+		}
+		resultType := reflect.TypeOf(resp)
+		expectedType := reflect.TypeOf(&Response{})
+		if resultType != expectedType {
+			t.Error(unexpectErr(resultType, expectedType))
+		}
+	}
+}
+
+// Test if the response's body is being echoed back right.
+func TestPutResponseBody(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(echoPostHandler))
+	defer ts.Close()
+	for _, arg := range postJSONArgs {
+		buf := new(bytes.Buffer)
+		err := json.NewEncoder(buf).Encode(arg)
+		if err != nil {
+			t.Error(err)
+		}
+		resp, err := Put(ts.URL, "application/json", buf)
+		if err != nil {
+			t.Error(err)
+		}
+		b := new(bytes.Buffer)
+		err = json.NewEncoder(b).Encode(arg)
+		if err != nil {
+			t.Error(err)
+		}
+		result := resp.String()
+		expected := b.String()
+		if result != expected {
+			t.Error(unexpectErr(result, expected))
+		}
+	}
+}
+
+func TestPutWithBadURLs(t *testing.T) {
+	for _, url := range badURLs {
+		_, err := Put(url, "", &bytes.Buffer{})
+		if err == nil {
+			t.Error(errors.New("Should return an error."))
+		}
+	}
+}
+
+/******************* PUT ******************************/
 
 func TestResponseLen(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(helloHandler))

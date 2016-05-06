@@ -39,17 +39,6 @@ func wrapRequest(method, urlStr string, body io.Reader, options []func(*Request)
 
 // Head sends a HTTP HEAD request to the provided url with the
 // functional options to add query paramaters, headers, timeout, etc.
-//
-//     addMimeType := func(r *Request) {
-//             r.Header.Add("content-type", "application/json")
-//     }
-//
-//     resp, err := requests.Head("http://httpbin.org/get", addMimeType)
-//     if err != nil {
-//             panic(err)
-//     }
-//     fmt.Println(resp.StatusCode)
-//
 func Head(urlStr string, options ...func(*Request)) (*Response, error) {
 	request, err := wrapRequest("HEAD", urlStr, nil, options)
 	if err != nil {
@@ -225,6 +214,23 @@ func PostJSON(urlStr string, body interface{}, options ...func(*Request)) (*Resp
 		return nil, err
 	}
 	request.Header.Set("Content-Type", "application/json")
+	resp, err := request.Client.Do(request.Request)
+	if err != nil {
+		return nil, err
+	}
+
+	// Wrap *http.Response with *Response
+	response := &Response{Response: resp}
+	return response, nil
+}
+
+// Put sends HTTP PUT request to the provided URL.
+func Put(urlStr, bodyType string, body io.Reader, options ...func(*Request)) (*Response, error) {
+	request, err := wrapRequest("PUT", urlStr, body, options)
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Set("Content-Type", bodyType)
 	resp, err := request.Client.Do(request.Request)
 	if err != nil {
 		return nil, err
