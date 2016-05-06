@@ -205,8 +205,9 @@ res, err := requests.PostJSON("https://httpbin.org/post", payload)
 
 ```
 
-### `requests.Head`
-HEAD requests are also supported with same signature as `requests.Get`.
+### Other Verbs
+`HEAD` and `PUT` requests are also supported with same signatures as `requests.Get` and
+`requests.Post`, respectively.
 
 Async
 -----
@@ -332,7 +333,7 @@ To suppress the errors from being returned, set the `IgnoreBadURL` field to `tru
 ```go
 
 results, _ := p.Get(urls, func(r *requests.Request) {
-        r.IgnoreBadURL = false
+        r.IgnoreBadURL = true
 })
 
 ```
