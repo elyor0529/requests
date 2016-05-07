@@ -240,3 +240,36 @@ func Put(urlStr, bodyType string, body io.Reader, options ...func(*Request)) (*R
 	response := &Response{Response: resp}
 	return response, nil
 }
+
+// Patch sends a HTTP PATCH request to the provided URL with optional body to modify data.
+func Patch(urlStr, bodyType string, body io.Reader, options ...func(*Request)) (*Response, error) {
+	request, err := wrapRequest("PATCH", urlStr, body, options)
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Set("Content-Type", bodyType)
+	resp, err := request.Client.Do(request.Request)
+	if err != nil {
+		return nil, err
+	}
+
+	// Wrap *http.Response with *Response
+	response := &Response{Response: resp}
+	return response, nil
+}
+
+// Delete sends a HTTP DELETE request to the provided URL.
+func Delete(urlStr string, options ...func(*Request)) (*Response, error) {
+	request, err := wrapRequest("DELETE", urlStr, nil, options)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := request.Client.Do(request.Request)
+	if err != nil {
+		return nil, err
+	}
+
+	// Wrap *http.Response with *Response
+	response := &Response{Response: resp}
+	return response, nil
+}

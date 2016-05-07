@@ -206,8 +206,7 @@ res, err := requests.PostJSON("https://httpbin.org/post", payload)
 ```
 
 ### Other Verbs
-`HEAD` and `PUT` requests are also supported with same signatures as `requests.Get` and
-`requests.Post`, respectively.
+`HEAD`, `PUT`, `PATCH`, and `DELETE` are supported. See the [doc]("https://godoc.org/github.com/jochasinga/requests") for more info.
 
 Async
 -----
@@ -269,11 +268,11 @@ An asynchronous counterpart of `requests.Post`.
 
 query := bytes.NewBufferString(`{
         "query" : {
-                "term" : { "user" : "poco" }
+            "term" : { "user" : "poco" }
         }
 }`)
 
-// Sending DSL query to Elasticsearch server
+// Sending query to Elasticsearch server
 rc, err := PostAsync("http://localhost:9200/users/_search", "application/json", query)
 if err != nil {
         t.Error(err)

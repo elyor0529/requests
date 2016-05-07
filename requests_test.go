@@ -520,7 +520,6 @@ func TestPostAsyncWithBadURL(t *testing.T) {
 	}
 }
 
-/******************* PUT ******************************/
 // Test if the response's body has the right type.
 func TestPutResponseType(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
@@ -574,7 +573,97 @@ func TestPutWithBadURLs(t *testing.T) {
 	}
 }
 
-/******************* PUT ******************************/
+func TestPatchResponseType(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
+	defer ts.Close()
+	for _, tt := range postFuncTestTable {
+		resp, err := Patch(ts.URL, tt.bodyType, tt.body, tt.opts...)
+		if err != nil {
+			t.Error(err)
+		}
+		resultType := reflect.TypeOf(resp)
+		expectedType := reflect.TypeOf(&Response{})
+		if resultType != expectedType {
+			t.Error(unexpectErr(resultType, expectedType))
+		}
+	}
+}
+
+func TestPatchResponseBody(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(echoPostHandler))
+	defer ts.Close()
+	for _, arg := range postJSONArgs {
+		buf := new(bytes.Buffer)
+		err := json.NewEncoder(buf).Encode(arg)
+		if err != nil {
+			t.Error(err)
+		}
+		resp, err := Put(ts.URL, "application/json", buf)
+		if err != nil {
+			t.Error(err)
+		}
+		b := new(bytes.Buffer)
+		err = json.NewEncoder(b).Encode(arg)
+		if err != nil {
+			t.Error(err)
+		}
+		result := resp.String()
+		expected := b.String()
+		if result != expected {
+			t.Error(unexpectErr(result, expected))
+		}
+	}
+}
+
+func TestPatchWithBadURLs(t *testing.T) {
+	for _, url := range badURLs {
+		_, err := Patch(url, "", &bytes.Buffer{})
+		if err == nil {
+			t.Error(errors.New("Should return an error."))
+		}
+	}
+}
+
+// Test that the returned type is always *Response.
+func TestDeleteResponseType(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
+	defer ts.Close()
+	for _, opts := range optList {
+		resp, err := Delete(ts.URL, opts...)
+		if err != nil {
+			t.Error(err)
+		}
+		resultType := reflect.TypeOf(resp)
+		expectedType := reflect.TypeOf(&Response{})
+		if resultType != expectedType {
+			t.Error(unexpectErr(resultType, expectedType))
+		}
+	}
+}
+
+// Test that the returned type is always *Response.
+func TestDeleteResponseBody(t *testing.T) {
+	for _, tt := range getFuncTestTable {
+		ts := httptest.NewServer(http.HandlerFunc(tt.handler))
+		defer ts.Close()
+		resp, err := Get(ts.URL, tt.fn)
+		if err != nil {
+			t.Error(err)
+		}
+		if resp.String() != tt.expected {
+			t.Error(err)
+		}
+	}
+}
+
+func TestDeleteWithBadURLs(t *testing.T) {
+	for _, url := range badURLs {
+		_, err := Delete(url)
+		if err == nil {
+			t.Error(errors.New("Should return an error."))
+		}
+	}
+}
 
 func TestResponseLen(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
