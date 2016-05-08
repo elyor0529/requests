@@ -206,7 +206,7 @@ res, err := requests.PostJSON("https://httpbin.org/post", payload)
 ```
 
 ### Other Verbs
-`HEAD`, `PUT`, `PATCH`, and `DELETE` are supported. See the [doc]("https://godoc.org/github.com/jochasinga/requests") for more info.
+`HEAD`, `PUT`, `PATCH`, `DELETE`, and `OPTIONS` are supported. See the [doc]("https://godoc.org/github.com/jochasinga/requests") for more info.
 
 Async
 -----
@@ -352,7 +352,7 @@ all the existing query string in the URL.
 
 addParams := func(r *requests.Request) {
         r.Params = url.Values{
-	        "name": {"Ava", "Sanchez", "Poco"},
+	        "name" : { "Ava", "Sanchez", "Poco" },
         }
 }
 

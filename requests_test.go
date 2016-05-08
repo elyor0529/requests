@@ -96,6 +96,10 @@ var (
 		w.Header().Set("content-type", "application/json")
 		w.Write(body)
 	}
+	optsHandler = func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("allow", "HEAD,GET,PUT,DELETE,OPTIONS")
+		w.WriteHeader(200)
+	}
 	// Test tables and array of functional options to use in tests.
 	optList = [...][]func(*Request){
 		{fn1},
@@ -646,12 +650,12 @@ func TestDeleteResponseBody(t *testing.T) {
 	for _, tt := range getFuncTestTable {
 		ts := httptest.NewServer(http.HandlerFunc(tt.handler))
 		defer ts.Close()
-		resp, err := Get(ts.URL, tt.fn)
+		resp, err := Delete(ts.URL, tt.fn)
 		if err != nil {
 			t.Error(err)
 		}
 		if resp.String() != tt.expected {
-			t.Error(err)
+			t.Error(unexpectErr(resp.String(), tt.expected))
 		}
 	}
 }
@@ -659,6 +663,60 @@ func TestDeleteResponseBody(t *testing.T) {
 func TestDeleteWithBadURLs(t *testing.T) {
 	for _, url := range badURLs {
 		_, err := Delete(url)
+		if err == nil {
+			t.Error(errors.New("Should return an error."))
+		}
+	}
+}
+
+// Test that the returned type is always *Response.
+func TestOptionsResponseType(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(optsHandler))
+	defer ts.Close()
+	resp, err := Options(ts.URL)
+	if err != nil {
+		t.Error(err)
+	}
+	resultType := reflect.TypeOf(resp)
+	expectedType := reflect.TypeOf(&Response{})
+	if resultType != expectedType {
+		t.Error(unexpectErr(resultType, expectedType))
+	}
+}
+
+// Test that the returned type is always *Response.
+func TestOptionsResponseCode(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(optsHandler))
+	defer ts.Close()
+	resp, err := Options(ts.URL)
+	if err != nil {
+		t.Error(err)
+	}
+	result := resp.StatusCode
+	expected := 200
+	if result != expected {
+		t.Error(unexpectErr(result, expected))
+	}
+}
+
+// Test that the returned type is always *Response.
+func TestOptionsResponseHeader(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(optsHandler))
+	defer ts.Close()
+	resp, err := Options(ts.URL)
+	if err != nil {
+		t.Error(err)
+	}
+	result := resp.Header.Get("allow")
+	expected := "HEAD,GET,PUT,DELETE,OPTIONS"
+	if result != expected {
+		t.Error(unexpectErr(result, expected))
+	}
+}
+
+func TestOptionsWithBadURLs(t *testing.T) {
+	for _, url := range badURLs {
+		_, err := Options(url)
 		if err == nil {
 			t.Error(errors.New("Should return an error."))
 		}

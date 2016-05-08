@@ -273,3 +273,20 @@ func Delete(urlStr string, options ...func(*Request)) (*Response, error) {
 	response := &Response{Response: resp}
 	return response, nil
 }
+
+// Options sends a rarely-used HTTP OPTIONS request to the provided URL.
+// Options only allows one parameter--the destination URL string.
+func Options(urlStr string) (*Response, error) {
+	request, err := wrapRequest("OPTIONS", urlStr, nil, []func(r *Request){})
+	if err != nil {
+		return nil, err
+	}
+	resp, err := request.Client.Do(request.Request)
+	if err != nil {
+		return nil, err
+	}
+
+	// Wrap *http.Response with *Response
+	response := &Response{Response: resp}
+	return response, nil
+}
