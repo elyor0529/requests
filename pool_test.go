@@ -60,6 +60,30 @@ func TestPoolGetURLs(t *testing.T) {
 	}
 }
 
+func TestPoolGetSameURL(t *testing.T) {
+	p := NewPool(3)
+	urls := []string{}
+	for i := 0; i <= 3; i++ {
+		urls = append(urls, ts1.URL)
+	}
+	rc, err := p.Get(urls)
+	if err != nil {
+		t.Error(err)
+	}
+	resp1 := <-rc
+	if resp1.StatusCode != 200 {
+		t.Error(unexpectErr(resp1.StatusCode, 200))
+	}
+	resp2 := <-rc
+	if resp2.StatusCode != 200 {
+		t.Error(unexpectErr(resp2.StatusCode, 200))
+	}
+	resp3 := <-rc
+	if resp3.StatusCode != 200 {
+		t.Error(unexpectErr(resp3.StatusCode, 200))
+	}
+}
+
 func TestPoolGetBadURLs(t *testing.T) {
 	p := NewPool(3)
 	_, err := p.Get(badURLs)
