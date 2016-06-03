@@ -16,9 +16,10 @@ func wrapRequest(method, urlStr string, body io.Reader, options []func(*Request)
 		return nil, err
 	}
 	request := &Request{
-		Request: req,
-		Client:  &http.Client{},
-		Params:  url.Values{},
+		Request:   req,
+		Client:    &http.Client{},
+		Transport: &http.Transport{},
+		Params:    url.Values{},
 	}
 
 	// Apply options in the parameters to request.

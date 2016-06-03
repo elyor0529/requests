@@ -34,6 +34,7 @@ type Request struct {
 	// "Inherite" both http.Request and http.Client
 	*http.Request
 	*http.Client
+	*http.Transport
 
 	// Params is an alias used to add query parameters to
 	// the request through functional options.

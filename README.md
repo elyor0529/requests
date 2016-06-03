@@ -1,5 +1,3 @@
-![blue gopher](http://i.imgur.com/hHNgf71.png?1)
-
 requests
 ========
 [![GoDoc](https://godoc.org/github.com/jochasinga/requests?status.svg)](https://godoc.org/github.com/jochasinga/requests)   [![Build Status](https://travis-ci.org/jochasinga/requests.svg?branch=master)](https://travis-ci.org/jochasinga/requests)   [![Coverage Status](https://coveralls.io/repos/github/jochasinga/requests/badge.svg?branch=master)](https://coveralls.io/github/jochasinga/requests?branch=master)     [![Donate](https://img.shields.io/badge/donate-$1-yellow.svg)](https://www.paypal.me/jochasinga/1.00)
@@ -13,11 +11,12 @@ It is safe for all [rodents](http://www.styletails.com/wp-content/uploads/2014/0
 
 Purpose
 -------
-I want to create a Go HTTP request package that would:
-+ Stay true to [net/http](https://golang.org/pkg/net/http/) APIs.
-+ Atomic--that means one doesn't have to go back to `net/http` doc all the time.
-+ Wrap useful operations such as [asynchronous requests](#asynchronous-apis) and [sending JSON](#requestspostjson).
-+ Stay idiomatic to the language.
+I need an HTTP request package that:
++ is atomic--All HTTP request configurations should be set, intuitively, on the request only.
++ wraps useful channels-ridden [asynchronous patterns](#asynchronous-apis).
++ has helper functions like [marshaling and posting JSON](#requestspostjson).
++ stays true to [net/http](https://golang.org/pkg/net/http/) APIs.
++ is idiomatic Go.
 
 Usage  
 -----
@@ -41,8 +40,12 @@ res, err := requests.Get("http://example.com", jsontype)
 requests uses custom [Request](https://godoc.org/github.com/jochasinga/requests#Request)
 and [Response](https://godoc.org/github.com/jochasinga/requests#Response) types
 to embed standard [http.Request](https://golang.org/pkg/net/http/#Request), [http.Response](https://golang.org/pkg/net/http/#Response), and [http.Client](https://golang.org/pkg/net/http/#Client)
-in order to insert helper methods, make configuring options atomic,
+in order to insert helper methods, make configuring options **atomic**,
 and [handle asynchronous errors](#handling-async-errors).
+
+The principle is, the caller should be able to set all the configurations on the
+"Request" instead of doing it on the client, transport, vice versa. For instance,
+`Timeout` can be set on the `Request`.
 
 ```go
 
@@ -58,6 +61,20 @@ if err != nil {
 
 // Helper method
 htmlStr := res.String()
+
+```
+
+Also, where `http.Transport` was normally needed to set control over
+proxies, TLS configuration, keep-alives, compression, and other settings,
+now everything is handled by `Request`.
+
+```go
+
+tlsConfig := func(r *requests.Request) {
+        r.TLSClientConfig = &tls.Config{RootCAs: x509.NewCertPool()}
+        r.DisableCompression = true
+}
+res, _ := requests.Get("http://example.com", tlsConfig)
 
 ```
 

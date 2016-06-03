@@ -3,6 +3,8 @@ package requests
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -263,6 +265,23 @@ func TestGetResponseOptions(t *testing.T) {
 		if resp.String() != tt.expected {
 			t.Error(err)
 		}
+	}
+}
+
+// Test that transport's attribute can be set on request
+func TestGetWithTransport(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
+	defer ts.Close()
+	opt := func(r *Request) {
+		r.TLSClientConfig = &tls.Config{RootCAs: x509.NewCertPool()}
+		r.DisableCompression = true
+	}
+	resp, err := Get(ts.URL, opt)
+	if err != nil {
+		t.Error(err)
+	}
+	if resp.String() != "Hello world!" {
+		t.Error(err)
 	}
 }
 
@@ -815,3 +834,5 @@ func TestResponseWithoutContentType(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+/*********************** TRANSPORT TEST ***************************/
