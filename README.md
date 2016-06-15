@@ -277,7 +277,7 @@ for i := 0; i < 3; i++ {
 
 ```
 
-Alternatively, [requests.Pool](#requestspool) can be used to collect concurrent responses.
+[requests.Pool](#requestspool) is recommended for collecting concurrent responses from multiple requests.
 
 ### `requests.PostAsync`
 An asynchronous counterpart of `requests.Post`.
@@ -293,11 +293,11 @@ query := bytes.NewBufferString(`{
 // Sending query to Elasticsearch server
 rc, err := PostAsync("http://localhost:9200/users/_search", "application/json", query)
 if err != nil {
-        t.Error(err)
+        panic(err)
 }
 resp := <-rc
 if resp.Error != nil {
-        t.Error(resp.Error)
+        panic(resp.Error)
 }
 result := resp.JSON()
 
@@ -345,11 +345,13 @@ for res := range results {
 You may want to ignore errors from malformed URLs instead of handling each of them,
 for instance, when crawling mass URLs.
 
-To suppress the errors from being returned, set the `IgnoreBadURL` field to `true`:
+To suppress the errors from being returned, either thrown away the error with `_` or
+set the `IgnoreBadURL` field to `true`, which suppress all internal errors 
+from crashing the pool:
 
 ```go
 
-results, _ := p.Get(urls, func(r *requests.Request) {
+results, err := p.Get(urls, func(r *requests.Request) {
         r.IgnoreBadURL = true
 })
 
