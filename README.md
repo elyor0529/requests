@@ -1,13 +1,14 @@
+![gopher family](http://4.bp.blogspot.com/-V2ixVlvhnMs/Uia8BtSFaFI/AAAAAAAAJVQ/5aEQVzX6K-E/s1600/GopherFamily.jpg)
+
 requests
 ========
 [![GoDoc](https://godoc.org/github.com/jochasinga/requests?status.svg)](https://godoc.org/github.com/jochasinga/requests)   [![Build Status](https://travis-ci.org/jochasinga/requests.svg?branch=master)](https://travis-ci.org/jochasinga/requests)   [![Coverage Status](https://coveralls.io/repos/github/jochasinga/requests/badge.svg?branch=master)](https://coveralls.io/github/jochasinga/requests?branch=master)     [![Donate](https://img.shields.io/badge/donate-$1-yellow.svg)](https://www.paypal.me/jochasinga/1.00)
 
-Functional HTTP Requests in Go.
+The friendliest way to make HTTP requests in Go. 
 
 Introduction
 ------------
-requests is a minimal, atomic, and functional way of making HTTP requests.
-It is safe for all [rodents](http://www.styletails.com/wp-content/uploads/2014/06/guinea-pig-booboo-lieveheersbeestje-2.jpg), not just Gophers.
+Ever find yourself going back and forth between [net/http](https://golang.org/pkg/net/http/) and [io](https://golang.org/pkg/io/) docs and your code while making HTTP calls? **Requests** takes care of that by abstracting several types on both ends to just `Request` and `Response`--just the way it should be. [Find out how](#usage) or [jump right in to examples](#examples).
 
 Purpose
 -------
@@ -18,7 +19,7 @@ I need an HTTP request package that:
 + stays true to [net/http](https://golang.org/pkg/net/http/) APIs.
 + is idiomatic Go.
 
-Usage  
+Usage
 -----
 the following are the core differences from the standard `net/http` package.
 
