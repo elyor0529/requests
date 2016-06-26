@@ -1,10 +1,8 @@
-![gopher family](http://4.bp.blogspot.com/-V2ixVlvhnMs/Uia8BtSFaFI/AAAAAAAAJVQ/5aEQVzX6K-E/s1600/GopherFamily.jpg)
-
 requests
 ========
 [![GoDoc](https://godoc.org/github.com/jochasinga/requests?status.svg)](https://godoc.org/github.com/jochasinga/requests)   [![Build Status](https://travis-ci.org/jochasinga/requests.svg?branch=master)](https://travis-ci.org/jochasinga/requests)   [![Coverage Status](https://coveralls.io/repos/github/jochasinga/requests/badge.svg?branch=master)](https://coveralls.io/github/jochasinga/requests?branch=master)     [![Donate](https://img.shields.io/badge/donate-$1-yellow.svg)](https://www.paypal.me/jochasinga/1.00)
 
-The friendliest way to make HTTP requests in Go. 
+The simplest and functional HTTP requests in Go. 
 
 Introduction
 ------------
