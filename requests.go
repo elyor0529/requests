@@ -26,8 +26,16 @@ func wrapRequest(method, urlStr string, body io.Reader, options []func(*Request)
 	for _, option := range options {
 		option(request)
 	}
-	sURL, _ := url.Parse(urlStr)
-	sURL.RawQuery = request.Params.Encode()
+	sURL, err := url.Parse(urlStr)
+	if err != nil {
+		return nil, err
+	}
+
+	// If request.Params is set, replace raw query with that.
+	if len(request.Params) > 0 {
+		sURL.RawQuery = request.Params.Encode()
+	}
+
 	req.URL = sURL
 
 	// Parse query values into r.Form

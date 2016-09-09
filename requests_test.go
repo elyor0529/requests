@@ -285,6 +285,59 @@ func TestGetWithTransport(t *testing.T) {
 	}
 }
 
+func paramsHandler(w http.ResponseWriter, r *http.Request) {
+	values := r.URL.Query()
+	for key := range values {
+		fmt.Fprintf(w, "%s", key)
+	}
+}
+
+// Get should favor query strings in the URL if provided instead of request.Params
+func TestGetWithQueryString(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(paramsHandler))
+	defer ts.Close()
+	resp, err := Get(ts.URL + "?key1=hello&key2=world")
+	if err != nil {
+		t.Error(err)
+	}
+	if resp.String() != "key1key2" {
+		t.Error("Parameters from query string were ignored")
+	}
+}
+
+// TestGetWithParamsSet tests a situation when the Params is set.
+func TestGetWithParamsSet(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(paramsHandler))
+	defer ts.Close()
+	resp, err := Get(ts.URL, func(r *Request) {
+		r.Params.Add("foo", "bar")
+	})
+	if err != nil {
+		t.Error(err)
+	}
+	if resp.String() != "foo" {
+		t.Errorf("Expect `foo`, got `%q`", resp.String())
+	}
+}
+
+// TestGetWithQueryStringAndParamsSet tests a case when both the query string
+// is provided in the URL and Params is set. Params should take precadence over
+// the query string in this case.
+func TestGetWithQueryStringAndParamsSet(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(paramsHandler))
+	defer ts.Close()
+
+	resp, err := Get(ts.URL+"?hello=world", func(r *Request) {
+		r.Params.Add("foo", "bar")
+	})
+	if err != nil {
+		t.Error(err)
+	}
+	if resp.String() != "foo" {
+		t.Errorf("Expect `foo`, got `%q`", resp.String())
+	}
+}
+
 // Get should wait for the response and return
 func TestGetResponseTime(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(helloHandler))
